@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+      
+    ports:
+      # Expose Traefik to the host on standard HTTP/HTTPS ports
+      - "80:80"     
+      - "443:443"   
+      - "8080:8080" # Traefik Dashboard (Internal Access ONLY)
+      
+    volumes:
+      # CRITICAL: Mount the Docker socket in read-only mode for dynamic configuration
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Named volume for certificate storage
+      - traefik_data:/data 
+      
+    command:
+      # 1. PROVIDERS: Enable Docker integration
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false 
+      - --providers.docker.network=proxy          
+      
+      # 2. ENTRYPOINTS: Define ports Traefik listens on
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      
+      # 3. HTTP -> HTTPS REDIRECTION
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      
+      # 4. API & DASHBOARD
+      - --api.dashboard=true
+      - --api.insecure=true 
+      
+    networks:
+      - proxy
+
+volumes:
+  traefik_data:
+    external: true
+
+networks:
+  proxy:
+    external: true

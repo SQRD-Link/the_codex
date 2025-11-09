@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  arcane:
+    image: ghcr.io/getarcaneapp/arcane:latest
+    container_name: arcane
+    restart: unless-stopped
+    
+    # PORTS section is excluded; Traefik handles the routing via the 'proxy' network.
+    
+    volumes:
+      # CRITICAL: Mount Docker socket for Arcane management access
+      - /var/run/docker.sock:/var/run/docker.sock:ro 
+      
+      # 💾 HOST BIND MOUNT: Persistent storage for Arcane's configuration data
+      - /srv/docker/volumes/arcane/data:/app/data
+      
+    environment:
+      # --- User ID / Group ID for host permissions ---
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Amsterdam
+      
+      # --- APPLICATION SECRETS & CONFIGURATION ---
+      - APP_URL=https://docker.sqrd.link 
+      
+      # Security secrets 
+      - ENCRYPTION_KEY=1d1866570aebb7bed6f27202baeaedc894370d2f463f0f5f06e30251941c58a3
+      - JWT_SECRET=aabe7094ce188471168617dc20c8604006e7bae155be516c17388b528bd5f2e7
+      
+      - DATABASE_URL=file:data/arcane.db?_pragma=journal_mode(WAL)&_pragma=busy_timeout(2500)&_txlock=immediate
+
+    # 🌐 TRAEFIK LABELS: Dynamic routing configuration
+    labels:
+      - "traefik.enable=true"
+      
+      # Router: Handles both external (via Pangolin tunnel) and local (direct) access 
+      - "traefik.http.routers.arcane-homelab.rule=Host(`docker.sqrd.link`) || Host(`docker.local`)"
+      - "traefik.http.routers.arcane-homelab.entrypoints=websecure"
+      - "traefik.http.routers.arcane-homelab.tls=true"
+      
+      # Service definition: Arcane's internal port is 3552
+      - "traefik.http.services.arcane.loadbalancer.server.port=3552"
+      
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
