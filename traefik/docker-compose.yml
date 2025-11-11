@@ -7,7 +7,11 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-      
+    environment:
+      # --- CLOUDFLARE CREDENTIALS (NEW) ---
+      - CF_API_EMAIL=s3qr3d@gmail.com 
+      - CF_DNS_API_TOKEN=kzJynFqQMiXI4RflcD3ymvI-b7guT0FC6oD4YUMk # Paste the token from Step 1
+      # ------------------------------------      
     ports:
       # Expose Traefik to the host on standard HTTP/HTTPS ports
       - "80:80"     
