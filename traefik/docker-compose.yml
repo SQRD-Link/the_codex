@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   traefik:
@@ -8,40 +8,39 @@ services:
     security_opt:
       - no-new-privileges:true
     environment:
-      # --- CLOUDFLARE CREDENTIALS (NEW) ---
-      - CF_API_EMAIL=s3qr3d@gmail.com 
-      - CF_DNS_API_TOKEN=kzJynFqQMiXI4RflcD3ymvI-b7guT0FC6oD4YUMk # Paste the token from Step 1
-      # ------------------------------------      
+      # Cloudflare credentials (voor DNS-challenge)
+      - CF_API_EMAIL=${CF_API_EMAIL}
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
     ports:
-      # Expose Traefik to the host on standard HTTP/HTTPS ports
-      - "80:80"     
-      - "443:443"   
-      - "8080:8080" # Traefik Dashboard (Internal Access ONLY)
-      
+      - "80:80"
+      - "443:443"
+      - "8080:8080" # Traefik dashboard
     volumes:
-      # CRITICAL: Mount the Docker socket in read-only mode for dynamic configuration
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      # Named volume for certificate storage
-      - traefik_data:/data 
-      
+      - traefik_data:/data
     command:
-      # 1. PROVIDERS: Enable Docker integration
+      # Docker provider
       - --providers.docker=true
-      - --providers.docker.exposedbydefault=false 
-      - --providers.docker.network=proxy          
-      
-      # 2. ENTRYPOINTS: Define ports Traefik listens on
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=proxy
+
+      # EntryPoints
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
-      
-      # 3. HTTP -> HTTPS REDIRECTION
+
+      # HTTP -> HTTPS redirect
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
-      
-      # 4. API & DASHBOARD
+
+      # API & dashboard
       - --api.dashboard=true
-      - --api.insecure=true 
-      
+      - --api.insecure=true   # later evt. uitzetten
+
+      # ACME / Let's Encrypt via Cloudflare DNS
+      - --certificatesresolvers.cf.acme.email=${CF_API_EMAIL}
+      - --certificatesresolvers.cf.acme.storage=/data/acme.json
+      - --certificatesresolvers.cf.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.cf.acme.dnschallenge.delaybeforecheck=0
     networks:
       - proxy
 

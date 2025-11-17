@@ -1,69 +1,7 @@
 services:
-  # A. Prowlarr (Indexer Manager) - Port 9696
-  prowlarr:
-    image: lscr.io/linuxserver/prowlarr:latest
-    container_name: prowlarr
-    restart: unless-stopped
-    environment:
-      - PUID=3001
-      - PGID=3001
-      - TZ=Europe/Amsterdam
-    volumes:
-      - /srv/docker/volumes/prowlarr/config:/config
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.prowlarr.rule=Host(`prowlarr.sqrd.link`) || Host(`prowlarr.local`)"
-      - "traefik.http.routers.prowlarr.entrypoints=websecure"
-      - "traefik.http.routers.prowlarr.tls=true"
-      - "traefik.http.services.prowlarr.loadbalancer.server.port=9696"
-    networks:
-      - proxy
-
-  # B. Sonarr (TV Shows) - Port 8989
-  sonarr:
-    image: lscr.io/linuxserver/sonarr:latest
-    container_name: sonarr
-    restart: unless-stopped
-    environment:
-      - PUID=3001
-      - PGID=3001
-      - TZ=Europe/Amsterdam
-    volumes:
-      - /srv/docker/volumes/sonarr/config:/config
-      - /data/media/TV:/tv 
-      - /data/media/downloads:/downloads 
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.sonarr.rule=Host(`sonarr.sqrd.link`) || Host(`sonarr.local`)"
-      - "traefik.http.routers.sonarr.entrypoints=websecure"
-      - "traefik.http.routers.routers.tls=true"
-      - "traefik.http.services.sonarr.loadbalancer.server.port=8989"
-    networks:
-      - proxy
-
-  # C. Radarr (Movies) - Port 7878
-  radarr:
-    image: lscr.io/linuxserver/radarr:latest
-    container_name: radarr
-    restart: unless-stopped
-    environment:
-      - PUID=3001
-      - PGID=3001
-      - TZ=Europe/Amsterdam
-    volumes:
-      - /srv/docker/volumes/radarr/config:/config
-      - /data/media/movies:/movies 
-      - /data/media/downloads:/downloads 
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.radarr.rule=Host(`radarr.sqrd.link`) || Host(`radarr.local`)"
-      - "traefik.http.routers.radarr.entrypoints=websecure"
-      - "traefik.http.routers.radarr.tls=true"
-      - "traefik.http.services.radarr.loadbalancer.server.port=7878"
-    networks:
-      - proxy
-      
-  # D. Jellyfin (Media Player) - Port 8096
+  # ================================
+  # JELLYFIN
+  # ================================
   jellyfin:
     image: lscr.io/linuxserver/jellyfin:latest
     container_name: jellyfin
@@ -76,17 +14,20 @@ services:
       - /srv/docker/volumes/jellyfin/config:/config
       - /data/media/movies:/movies
       - /data/media/TV:/tv
-    # If using iGPU: ADD THIS LINE LATER: devices: - /dev/dri:/dev/dri 
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.jellyfin.rule=Host(`jellyfin.sqrd.link`) || Host(`jellyfin.local`)"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.jellyfin.rule=Host(`jellyfin.sqrd.link`)"
       - "traefik.http.routers.jellyfin.entrypoints=websecure"
       - "traefik.http.routers.jellyfin.tls=true"
+      - "traefik.http.routers.jellyfin.tls.certresolver=cf"
       - "traefik.http.services.jellyfin.loadbalancer.server.port=8096"
     networks:
       - proxy
-      
-  # E. qBittorrent (Download Client) - Port 8080
+
+  # ================================
+  # QBITTORRENT
+  # ================================
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:latest
     container_name: qbittorrent
@@ -95,39 +36,202 @@ services:
       - PUID=3001
       - PGID=3001
       - TZ=Europe/Amsterdam
+      - WEBUI_PORT=8080
     volumes:
       - /srv/docker/volumes/qbittorrent/config:/config
       - /data/media/downloads:/downloads
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.sqrd.link`) || Host(`qbittorrent.local`)"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.sqrd.link`)"
       - "traefik.http.routers.qbittorrent.entrypoints=websecure"
       - "traefik.http.routers.qbittorrent.tls=true"
+      - "traefik.http.routers.qbittorrent.tls.certresolver=cf"
       - "traefik.http.services.qbittorrent.loadbalancer.server.port=8080"
     networks:
       - proxy
-      
-  # F. Overseerr (Request Management) - Port 5055
+
+  # ================================
+  # SONARR
+  # ================================
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    restart: unless-stopped
+    environment:
+      - PUID=3001
+      - PGID=3001
+      - TZ=Europe/Amsterdam
+    volumes:
+      - /srv/docker/volumes/sonarr/config:/config
+      - /data/media/TV:/tv
+      - /data/media/downloads:/downloads
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.sonarr.rule=Host(`sonarr.sqrd.link`)"
+      - "traefik.http.routers.sonarr.entrypoints=websecure"
+      - "traefik.http.routers.sonarr.tls=true"
+      - "traefik.http.routers.sonarr.tls.certresolver=cf"
+      - "traefik.http.services.sonarr.loadbalancer.server.port=8989"
+    networks:
+      - proxy
+
+  # ================================
+  # RADARR
+  # ================================
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    restart: unless-stopped
+    environment:
+      - PUID=3001
+      - PGID=3001
+      - TZ=Europe/Amsterdam
+    volumes:
+      - /srv/docker/volumes/radarr/config:/config
+      - /data/media/movies:/movies
+      - /data/media/downloads:/downloads
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.radarr.rule=Host(`radarr.sqrd.link`)"
+      - "traefik.http.routers.radarr.entrypoints=websecure"
+      - "traefik.http.routers.radarr.tls=true"
+      - "traefik.http.routers.radarr.tls.certresolver=cf"
+      - "traefik.http.services.radarr.loadbalancer.server.port=7878"
+    networks:
+      - proxy
+
+  # ================================
+  # LIDARR
+  # ================================
+  lidarr:
+    image: lscr.io/linuxserver/lidarr:latest
+    container_name: lidarr
+    restart: unless-stopped
+    environment:
+      - PUID=3001
+      - PGID=3001
+      - TZ=Europe/Amsterdam
+    volumes:
+      - /srv/docker/volumes/lidarr/config:/config
+      - /data/media/music:/music
+      - /data/media/downloads:/downloads
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.lidarr.rule=Host(`lidarr.sqrd.link`)"
+      - "traefik.http.routers.lidarr.entrypoints=websecure"
+      - "traefik.http.routers.lidarr.tls=true"
+      - "traefik.http.routers.lidarr.tls.certresolver=cf"
+      - "traefik.http.services.lidarr.loadbalancer.server.port=8686"
+    networks:
+      - proxy
+
+  # ================================
+  # BAZARR
+  # ================================
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    restart: unless-stopped
+    environment:
+      - PUID=3001
+      - PGID=3001
+      - TZ=Europe/Amsterdam
+    volumes:
+      - /srv/docker/volumes/bazarr/config:/config
+      - /data/media/movies:/movies
+      - /data/media/TV:/tv
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.bazarr.rule=Host(`bazarr.sqrd.link`)"
+      - "traefik.http.routers.bazarr.entrypoints=websecure"
+      - "traefik.http.routers.bazarr.tls=true"
+      - "traefik.http.routers.bazarr.tls.certresolver=cf"
+      - "traefik.http.services.bazarr.loadbalancer.server.port=6767"
+    networks:
+      - proxy
+
+  # ================================
+  # PROWLARR
+  # ================================
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    restart: unless-stopped
+    environment:
+      - PUID=3001
+      - PGID=3001
+      - TZ=Europe/Amsterdam
+    volumes:
+      - /srv/docker/volumes/prowlarr/config:/config
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.prowlarr.rule=Host(`prowlarr.sqrd.link`)"
+      - "traefik.http.routers.prowlarr.entrypoints=websecure"
+      - "traefik.http.routers.prowlarr.tls=true"
+      - "traefik.http.routers.prowlarr.tls.certresolver=cf"
+      - "traefik.http.services.prowlarr.loadbalancer.server.port=9696"
+    networks:
+      - proxy
+
+  # ================================
+  # OVERSEERR
+  # ================================
   overseerr:
     image: sctx/overseerr:latest
     container_name: overseerr
     restart: unless-stopped
     environment:
-      - PUID=3001
-      - PGID=3001
+      - LOG_LEVEL=debug
       - TZ=Europe/Amsterdam
       - PORT=5055
     volumes:
       - /srv/docker/volumes/overseerr/config:/app/config
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.overseerr.rule=Host(`overseerr.sqrd.link`) || Host(`overseerr.local`)"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.overseerr.rule=Host(`overseerr.sqrd.link`)"
       - "traefik.http.routers.overseerr.entrypoints=websecure"
       - "traefik.http.routers.overseerr.tls=true"
+      - "traefik.http.routers.overseerr.tls.certresolver=cf"
       - "traefik.http.services.overseerr.loadbalancer.server.port=5055"
     networks:
       - proxy
-      
+
+  # ================================
+  # SABNZBD
+  # ================================
+  sabnzbd:
+    image: lscr.io/linuxserver/sabnzbd:latest
+    container_name: sabnzbd
+    restart: unless-stopped
+    environment:
+      - PUID=3001
+      - PGID=3001
+      - TZ=Europe/Amsterdam
+    volumes:
+      - /srv/docker/volumes/sabnzbd/config:/config
+      - /data/media/downloads:/downloads
+      - /data/media/tempdl:/tempdl
+      - /data/media/get:/get
+      - /data/media/movies:/movies
+      - /data/media/TV:/tv
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.sabnzbd.rule=Host(`sabnzbd.sqrd.link`)"
+      - "traefik.http.routers.sabnzbd.entrypoints=websecure"
+      - "traefik.http.routers.sabnzbd.tls=true"
+      - "traefik.http.routers.sabnzbd.tls.certresolver=cf"
+      - "traefik.http.services.sabnzbd.loadbalancer.server.port=8080"
+    networks:
+      - proxy
+
 networks:
   proxy:
     external: true
