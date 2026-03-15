@@ -1,27 +1,27 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  newt:
-    image: fosrl/newt:latest
-    container_name: newt
-    restart: unless-stopped
-    
-    # Newt must be on the 'proxy' network to see Traefik
-    networks:
-      - proxy 
-      
-    volumes:
-      # Optional: Mount socket for discovery (needed for Blueprints later)
-      - /var/run/docker.sock:/var/run/docker.sock:ro 
-      
-    environment:
-      # --- REPLACE WITH YOUR FRESH CREDENTIALS FROM VPS ---
-      - NEWT_ID=n1qz80zi5sa9xoy
-      - NEWT_SECRET=by9jeot2uo2v2l6md5amv49js83y1f6x3uoi6i972iom104b
-      - PANGOLIN_ENDPOINT=https://pangolin.prtsr.nl
-      
-      # Since Newt is on the same host, it should easily reach Traefik
+    newt:
+        image: fosrl/newt:latest
+        container_name: newt
+        restart: unless-stopped
+
+        # Newt must be on the 'proxy' network to see Traefik
+        networks:
+            - proxy
+
+        volumes:
+            # Optional: Mount socket for discovery (needed for Blueprints later)
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+
+        environment:
+            # --- REPLACE WITH YOUR FRESH CREDENTIALS FROM VPS ---
+            - NEWT_ID=n1qz80zi5sa9xoy
+            - NEWT_SECRET=${NEWT_SECRET}
+            - PANGOLIN_ENDPOINT=https://pangolin.prtsr.nl
+
+            # Since Newt is on the same host, it should easily reach Traefik
 
 networks:
-  proxy:
-    external: true
+    proxy:
+        external: true
