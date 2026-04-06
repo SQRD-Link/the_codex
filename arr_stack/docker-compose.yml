@@ -180,26 +180,28 @@ services:
             - proxy
 
     # ================================
-    # OVERSEERR
+    # SEERR
     # ================================
-    seer:
-        image: sctx/seer:latest
-        container_name: seer
+    seerr:
+        image: ghcr.io/seerr-team/seerr:latest
+        container_name: seerr
+        # This is required for the new Seerr image to handle signals correctly
+        init: true
         restart: unless-stopped
         environment:
             - LOG_LEVEL=debug
             - TZ=Europe/Amsterdam
             - PORT=5055
         volumes:
-            - /srv/docker/volumes/seer/config:/app/config
+            - /srv/docker/volumes/seerr/config:/app/config
         labels:
             - "traefik.enable=true"
             - "traefik.docker.network=proxy"
-            - "traefik.http.routers.seer.rule=Host(`seer.sqrd.link`) || Host(`verzoekjes.sqrd.link`)"
-            - "traefik.http.routers.seer.entrypoints=websecure"
-            - "traefik.http.routers.seer.tls=true"
-            - "traefik.http.routers.seer.tls.certresolver=cf"
-            - "traefik.http.services.seer.loadbalancer.server.port=5055"
+            - "traefik.http.routers.seerr.rule=Host(`seer.sqrd.link`) || Host(`verzoekjes.sqrd.link`)"
+            - "traefik.http.routers.seerr.entrypoints=websecure"
+            - "traefik.http.routers.seerr.tls=true"
+            - "traefik.http.routers.seerr.tls.certresolver=cf"
+            - "traefik.http.services.seerr.loadbalancer.server.port=5055"
         networks:
             - proxy
 
