@@ -16,9 +16,9 @@ services:
             - proxy
         environment:
             SEMAPHORE_DB_DIALECT: bolt
-            SEMAPHORE_ADMIN: ${SEMAPHORE_ADMIN:-admin}
-            SEMAPHORE_ADMIN_NAME: ${SEMAPHORE_ADMIN_NAME:-Richard}
-            SEMAPHORE_ADMIN_EMAIL: ${SEMAPHORE_ADMIN_EMAIL:-admin@sqrd.link}
+            SEMAPHORE_ADMIN: ${SEMAPHORE_ADMIN}
+            SEMAPHORE_ADMIN_NAME: ${SEMAPHORE_ADMIN_NAME}
+            SEMAPHORE_ADMIN_EMAIL: ${SEMAPHORE_ADMIN_EMAIL}
             SEMAPHORE_ADMIN_PASSWORD_FILE: /run/secrets/semaphore_admin_pw
             SEMAPHORE_ACCESS_KEY_ENCRYPTION_FILE: /run/secrets/semaphore_access_key_encryption
             SEMAPHORE_WEB_ROOT: "https://semaphore.sqrd.link"
