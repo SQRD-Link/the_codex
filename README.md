@@ -1,79 +1,71 @@
 # The Codex - Docker Compose Setup
 
-This repository contains a collection of Docker Compose configurations for various services used in my homelab environment. All sensitive credentials have been moved from the Docker Compose files to .env files for improved security and management.
+This repository contains Docker Compose configurations for services running on `docker.sqrd.link` (10.10.100.75).
 
-## Security Improvements
-
-Previously, sensitive information such as API keys, passwords, and secrets were hardcoded directly in the Docker Compose files. This approach posed security risks as these files could be accidentally committed to version control or exposed in logs.
-
-To address this, I've implemented a secure approach by:
-
-1. Moving all sensitive credentials to `.env` files
-2. Using the `env_file` directive in Docker Compose to load environment variables
-3. Adding `.env` files to `.gitignore` to prevent accidental commits
-4. Creating `.env.example` templates for easy setup
+All sensitive credentials are stored in `.env` files and excluded from version control via `.gitignore`.
 
 ## Directory Structure
 
 Each service directory contains:
-- `docker-compose.yml` - The main Docker Compose configuration
-- `.env` - Environment variables (not committed to version control)
-- `.env.example` - Template with placeholder values
+- `docker-compose.yml` — main compose config
+- `.env` — environment variables (not committed)
+- `.env.example` — template with placeholder values
 
 ## How to Use
 
-1. **Copy the example files**:
+1. Copy the example file:
    ```bash
    cp service_name/.env.example service_name/.env
    ```
-
-2. **Edit the .env files** with your actual credentials:
+2. Fill in credentials:
    ```bash
    nano service_name/.env
    ```
-
-3. **Start the services**:
+3. Start the service:
    ```bash
    docker compose up -d
    ```
 
 ## Services
 
-### Arcane
-- **Purpose**: Application management and orchestration
-- **Credentials**: ENCRYPTION_KEY, JWT_SECRET
+### adguard-sync
+Syncs AdGuard Home config from primary (10.10.100.1) to secondary (10.10.100.2).
 
-### Netbox
-- **Purpose**: Network automation and documentation
-- **Credentials**: SECRET_KEY, DB_PASSWORD, REDIS_PASSWORD, REDIS_CACHE_PASSWORD
+### arcane
+Docker management UI.
 
-### Newt
-- **Purpose**: Network monitoring and management
-- **Credentials**: NEWT_ID, NEWT_SECRET
+### arr_stack
+Full media stack: Sonarr, Radarr, Lidarr, Bazarr, Prowlarr, SABnzbd, qBittorrent, Seerr.
 
-### Traefik
-- **Purpose**: Reverse proxy and load balancer
-- **Credentials**: CF_API_EMAIL, CF_DNS_API_TOKEN
+### mealie
+Recipe manager and meal planner. Available at `mealie.sqrd.link`.
 
-### Immich
-- **Purpose**: Self-hosted photo management
-- **Credentials**: DB_PASSWORD, DB_USERNAME, DB_DATABASE_NAME
+### n8n
+Workflow automation. Includes n8n app, Postgres database, and n8n-mcp server.
+- n8n UI: `n8n.sqrd.link`
+- n8n-mcp runs in HTTP mode on port 3001, connects to n8n via `N8N_API_KEY`
+
+### netbox
+IPAM and dynamic Ansible inventory source. Available at `netbox.sqrd.link`.
+
+### newt
+Pangolin tunnel client — connects back to internal Pangolin reverse proxy.
+
+### openwebui
+LLM frontend (OpenAI-compatible). Available at `openwebui.sqrd.link`.
+
+### semaphore
+Ansible UI and scheduler. Uses custom image (`semaphore-netbox`) with pynetbox support.
+
+### traefik
+Reverse proxy. Handles all `*.sqrd.link` routing via labels.
+
+### vaultwarden
+Self-hosted Bitwarden-compatible password manager.
 
 ## Important Notes
 
-1. **Never commit .env files** to version control - they are already ignored
-2. **Always create .env files from .env.example** templates
-3. **Use strong, unique passwords** for all services
-4. **Regularly rotate sensitive credentials**
-5. **Keep .env.example files updated** with any new environment variables
-
-## Environment Variable Loading
-
-Each Docker Compose file uses the `env_file` directive to load variables from the corresponding `.env` file:
-
-```yaml
-env_file:
-  - .env
-```
-
-This approach provides better separation of configuration and code, making the setup more maintainable and secure.
+- **Never commit `.env` files** — already in `.gitignore`
+- **Always use `.env.example`** as the template for new setups
+- Immich is **not** running here — it lives on nastradamus (TrueNAS)
+- All services attach to the shared `proxy` Docker network for Traefik routing
