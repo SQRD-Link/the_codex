@@ -15,7 +15,8 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.vaultwarden.rule=Host(`vault.sqrd.link`)"
       - "traefik.http.routers.vaultwarden.entrypoints=websecure"
-      - "traefik.http.routers.vaultwarden.tls.certresolver=cloudflare" # Of jouw specifieke resolver
+      - "traefik.http.routers.vaultwarden.tls=true"
+      - "traefik.http.routers.vaultwarden.tls.certresolver=cf"
       - "traefik.http.services.vaultwarden.loadbalancer.server.port=80"
 
 networks:
