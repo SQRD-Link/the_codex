@@ -1,53 +1,51 @@
-version: "3.8"
-
 services:
-  traefik:
-    image: traefik:v3.0
-    container_name: traefik
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    environment:
-      # Cloudflare credentials (voor DNS-challenge)
-      - CF_API_EMAIL=${CF_API_EMAIL}
-      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
-    ports:
-      - "80:80"
-      - "443:443"
-      - "8080:8080" # Traefik dashboard
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - traefik_data:/data
-    command:
-      # Docker provider
-      - --providers.docker=true
-      - --providers.docker.exposedbydefault=false
-      - --providers.docker.network=proxy
+    traefik:
+        image: traefik:v3.0
+        container_name: traefik
+        restart: unless-stopped
+        security_opt:
+            - no-new-privileges:true
+        environment:
+            # Cloudflare credentials (voor DNS-challenge)
+            - CF_API_EMAIL=${CF_API_EMAIL}
+            - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+        ports:
+            - "80:80"
+            - "443:443"
+            - "8080:8080" # Traefik dashboard
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+            - traefik_data:/data
+        command:
+            # Docker provider
+            - --providers.docker=true
+            - --providers.docker.exposedbydefault=false
+            - --providers.docker.network=proxy
 
-      # EntryPoints
-      - --entrypoints.web.address=:80
-      - --entrypoints.websecure.address=:443
+            # EntryPoints
+            - --entrypoints.web.address=:80
+            - --entrypoints.websecure.address=:443
 
-      # HTTP -> HTTPS redirect
-      - --entrypoints.web.http.redirections.entrypoint.to=websecure
-      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+            # HTTP -> HTTPS redirect
+            - --entrypoints.web.http.redirections.entrypoint.to=websecure
+            - --entrypoints.web.http.redirections.entrypoint.scheme=https
 
-      # API & dashboard
-      - --api.dashboard=true
-      - --api.insecure=true   # later evt. uitzetten
+            # API & dashboard
+            - --api.dashboard=true
+            - --api.insecure=true # later evt. uitzetten
 
-      # ACME / Let's Encrypt via Cloudflare DNS
-      - --certificatesresolvers.cf.acme.email=${CF_API_EMAIL}
-      - --certificatesresolvers.cf.acme.storage=/data/acme.json
-      - --certificatesresolvers.cf.acme.dnschallenge.provider=cloudflare
-      - --certificatesresolvers.cf.acme.dnschallenge.delaybeforecheck=0
-    networks:
-      - proxy
+            # ACME / Let's Encrypt via Cloudflare DNS
+            - --certificatesresolvers.cf.acme.email=${CF_API_EMAIL}
+            - --certificatesresolvers.cf.acme.storage=/data/acme.json
+            - --certificatesresolvers.cf.acme.dnschallenge.provider=cloudflare
+            - --certificatesresolvers.cf.acme.dnschallenge.delaybeforecheck=0
+        networks:
+            - proxy
 
 volumes:
-  traefik_data:
-    external: true
+    traefik_data:
+        external: true
 
 networks:
-  proxy:
-    external: true
+    proxy:
+        external: true
