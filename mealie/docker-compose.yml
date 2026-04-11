@@ -1,0 +1,25 @@
+services:
+  mealie:
+    image: ghcr.io/mealie-recipes/mealie:latest
+    container_name: mealie
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Amsterdam
+      - BASE_URL=https://mealie.sqrd.link
+      - PUID=1000
+      - PGID=1000
+      - ALLOW_SIGNUP=false
+    volumes:
+      - /srv/docker/volumes/mealie:/app/data
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mealie.rule=Host(`mealie.sqrd.link`)"
+      - "traefik.http.routers.mealie.entrypoints=websecure"
+      - "traefik.http.routers.mealie.tls=true"
+      - "traefik.http.services.mealie.loadbalancer.server.port=9000"
+
+networks:
+  proxy:
+    external: true
