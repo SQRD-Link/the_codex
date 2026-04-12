@@ -104,32 +104,6 @@ services:
             - proxy
 
     # ================================
-    # LIDARR
-    # ================================
-    lidarr:
-        image: lscr.io/linuxserver/lidarr:latest
-        container_name: lidarr
-        restart: unless-stopped
-        environment:
-            - PUID=3001
-            - PGID=3001
-            - TZ=Europe/Amsterdam
-        volumes:
-            - /srv/docker/volumes/lidarr/config:/config
-            - /data/media/music:/music
-            - /data/media/downloads:/downloads
-        labels:
-            - "traefik.enable=true"
-            - "traefik.docker.network=proxy"
-            - "traefik.http.routers.lidarr.rule=Host(`lidarr.sqrd.link`)"
-            - "traefik.http.routers.lidarr.entrypoints=websecure"
-            - "traefik.http.routers.lidarr.tls=true"
-            - "traefik.http.routers.lidarr.tls.certresolver=cf"
-            - "traefik.http.services.lidarr.loadbalancer.server.port=8686"
-        networks:
-            - proxy
-
-    # ================================
     # BAZARR
     # ================================
     bazarr:
@@ -185,7 +159,6 @@ services:
     seerr:
         image: ghcr.io/seerr-team/seerr:latest
         container_name: seerr
-        # This is required for the new Seerr image to handle signals correctly
         init: true
         restart: unless-stopped
         environment:
