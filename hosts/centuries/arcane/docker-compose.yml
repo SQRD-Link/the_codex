@@ -1,0 +1,35 @@
+services:
+    arcane:
+        image: ghcr.io/getarcaneapp/arcane:latest
+        container_name: arcane
+        restart: unless-stopped
+
+        # PORTS section is excluded; Traefik handles the routing via the 'proxy' network.
+
+        volumes:
+            # CRITICAL: Mount Docker socket for Arcane management access
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+            - /srv/docker/volumes/arcane/data:/app/data
+
+        environment:
+            - PUID=1000
+            - PGID=1000
+            - TZ=Europe/Amsterdam
+            - APP_URL=https://centuries.sqrd.link
+            - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+            - JWT_SECRET=${JWT_SECRET}
+            - DATABASE_URL=file:data/arcane.db?_pragma=journal_mode(WAL)&_pragma=busy_timeout(2500)&_txlock=immediate
+
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.arcane.rule=Host(`centuries.sqrd.link`)"
+            - "traefik.http.routers.arcane.entrypoints=websecure"
+            - "traefik.http.routers.arcane.tls=true"
+            - "traefik.http.services.arcane.loadbalancer.server.port=3552"
+
+        networks:
+            - proxy
+
+networks:
+    proxy:
+        external: true

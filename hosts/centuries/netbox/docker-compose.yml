@@ -1,0 +1,76 @@
+services:
+    netbox:
+        image: docker.io/netboxcommunity/netbox:latest
+        container_name: netbox
+        restart: unless-stopped
+        depends_on:
+            - postgres
+            - redis-task
+            - redis-cache
+        volumes:
+            - /srv/docker/volumes/netbox/config:/etc/netbox/config
+            - /srv/docker/volumes/netbox/media:/opt/netbox/netbox/media
+        environment:
+            - ALLOWED_HOSTS=netbox.sqrd.link,netbox.local,*
+            - SECRET_KEY=${SECRET_KEY}
+            - DB_NAME=netbox
+            - DB_USER=netbox
+            - DB_PASSWORD=${DB_PASSWORD}
+            - DB_HOST=postgres
+            - REDIS_PASSWORD=${REDIS_PASSWORD}
+            - REDIS_CACHE_PASSWORD=${REDIS_CACHE_PASSWORD}
+            - WEB_WORKERS=4
+            - GRAPHQL_ENABLED=true
+            - DB_PORT=5432
+            - REDIS_HOST=redis-task
+            - REDIS_CACHE_HOST=redis-cache
+            - REDIS_PORT=6379
+            - REDIS_CACHE_PORT=6379
+            - REDIS_DATABASE=0
+            - REDIS_CACHE_DATABASE=1
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.netbox-app.rule=Host(`netbox.sqrd.link`)"
+            - "traefik.http.routers.netbox-app.entrypoints=websecure"
+            - "traefik.http.routers.netbox-app.tls=true"
+            - "traefik.http.services.netbox-app.loadbalancer.server.port=8080"
+        networks:
+            - proxy
+
+    postgres:
+        image: postgres:17-alpine
+        container_name: netbox_postgres
+        restart: unless-stopped
+        environment:
+            - POSTGRES_DB=netbox
+            - POSTGRES_USER=netbox
+            - POSTGRES_PASSWORD=${DB_PASSWORD}
+            - PGDATA=/var/lib/postgresql/data/pgdata
+        volumes:
+            - /srv/docker/volumes/netbox/db:/var/lib/postgresql/data
+        networks:
+            - proxy
+
+    redis-task:
+        image: valkey/valkey:8.1-alpine
+        container_name: netbox_redis_task
+        restart: unless-stopped
+        command: --requirepass ${REDIS_PASSWORD}
+        volumes:
+            - /srv/docker/volumes/netbox/redis_task:/data
+        networks:
+            - proxy
+
+    redis-cache:
+        image: valkey/valkey:8.1-alpine
+        container_name: netbox_redis_cache
+        restart: unless-stopped
+        command: --requirepass ${REDIS_CACHE_PASSWORD}
+        volumes:
+            - /srv/docker/volumes/netbox/redis_cache:/data
+        networks:
+            - proxy
+
+networks:
+    proxy:
+        external: true

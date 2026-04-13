@@ -1,0 +1,17 @@
+# Omada Controller — TP-Link network management
+# Accessible at omada.sqrd.link / 10.10.100.12:30077
+services:
+  omada:
+    image: mbentley/omada-controller:latest
+    container_name: omada-controller
+    restart: unless-stopped
+    network_mode: host  # Omada requires host networking for AP discovery
+    environment:
+      - TZ=Europe/Amsterdam
+      - MANAGE_HTTP_PORT=8088
+      - MANAGE_HTTPS_PORT=30077
+      - PORTAL_HTTP_PORT=8088
+      - PORTAL_HTTPS_PORT=8843
+    volumes:
+      - /srv/docker/volumes/omada/data:/opt/tplink/EAPController/data
+      - /srv/docker/volumes/omada/logs:/opt/tplink/EAPController/logs

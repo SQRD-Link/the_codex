@@ -1,0 +1,11 @@
+# AdGuard Home 2 — secondary DNS, synced from primary via adguard-sync on centuries
+# Runs on nastradamus at 10.10.100.2
+services:
+  adguard:
+    image: adguard/adguardhome:latest
+    container_name: adguard-home-2
+    restart: unless-stopped
+    network_mode: host  # Needs host networking for DNS (port 53)
+    volumes:
+      - /srv/docker/volumes/adguard/work:/opt/adguardhome/work
+      - /srv/docker/volumes/adguard/conf:/opt/adguardhome/conf

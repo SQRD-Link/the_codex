@@ -1,0 +1,9 @@
+services:
+  waha:
+    image: devlikeapro/waha:latest
+    container_name: waha
+    restart: unless-stopped
+    volumes:
+      - /srv/docker/volumes/waha:/app/.sessions
+    ports:
+      - "3000:3000"

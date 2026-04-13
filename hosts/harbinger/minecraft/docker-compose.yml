@@ -1,0 +1,13 @@
+services:
+  minecraft-survival-online:
+    image: itzg/minecraft-server:latest
+    container_name: minecraft-survival-online
+    restart: unless-stopped
+    environment:
+      - EULA=TRUE
+      - TZ=Europe/Amsterdam
+    volumes:
+      - /srv/docker/volumes/minecraft/survival-online:/data
+    ports:
+      - "25567:25565"
+      - "24454:24454/udp"  # Voice chat (Simple Voice Chat mod)

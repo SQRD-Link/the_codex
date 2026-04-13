@@ -1,0 +1,22 @@
+# Pangolin reverse proxy + Gerbil tunnel server
+# Managed via separate pangolin repo — compose lives here for reference
+# See https://github.com/SQRD-Link/pangolin for full config
+services:
+    pangolin:
+        image: fosrl/pangolin:latest
+        container_name: pangolin
+        restart: unless-stopped
+        # Config lives in /home/link/config/
+        volumes:
+            - /srv/docker/volumes/pangolin/config:/app/config
+        ports:
+            - "3000:3000"   # Pangolin dashboard
+            - "443:443"     # HTTPS
+            - "80:80"       # HTTP
+
+    gerbil:
+        image: fosrl/gerbil:latest
+        container_name: gerbil
+        restart: unless-stopped
+        depends_on:
+            - pangolin

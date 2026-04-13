@@ -1,0 +1,9 @@
+services:
+  website:
+    image: nginx:latest
+    container_name: website
+    restart: unless-stopped
+    volumes:
+      - /srv/docker/volumes/website:/usr/share/nginx/html:ro
+    ports:
+      - "8090:80"

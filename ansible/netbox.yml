@@ -1,0 +1,9 @@
+plugin: netbox.netbox.nb_inventory
+api_endpoint: http://netbox.sqrd.link
+token: "{{ lookup('env', 'NETBOX_TOKEN') }}"
+validate_certs: false
+config_context: true
+group_by:
+  - device_roles
+  - sites
+  - tags

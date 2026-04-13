@@ -1,0 +1,17 @@
+services:
+    newt:
+        image: fosrl/newt:latest
+        container_name: newt
+        restart: unless-stopped
+        networks:
+            - proxy
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+        environment:
+            - NEWT_ID=${NEWT_ID}
+            - NEWT_SECRET=${NEWT_SECRET}
+            - PANGOLIN_ENDPOINT=https://pangolin.prtsr.nl
+
+networks:
+    proxy:
+        external: true

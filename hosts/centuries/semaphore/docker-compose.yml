@@ -1,0 +1,41 @@
+secrets:
+    semaphore_admin_pw:
+        file: /srv/docker/secrets/semaphore_admin_password.txt
+    semaphore_access_key_encryption:
+        file: /srv/docker/secrets/semaphore_access_key_encryption.txt
+
+services:
+    semaphore:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        image: semaphore-netbox:latest
+        container_name: semaphore
+        restart: unless-stopped
+        networks:
+            - proxy
+        environment:
+            SEMAPHORE_DB_DIALECT: bolt
+            SEMAPHORE_ADMIN: ${SEMAPHORE_ADMIN}
+            SEMAPHORE_ADMIN_NAME: ${SEMAPHORE_ADMIN_NAME}
+            SEMAPHORE_ADMIN_EMAIL: ${SEMAPHORE_ADMIN_EMAIL}
+            SEMAPHORE_ADMIN_PASSWORD_FILE: /run/secrets/semaphore_admin_pw
+            SEMAPHORE_ACCESS_KEY_ENCRYPTION_FILE: /run/secrets/semaphore_access_key_encryption
+            SEMAPHORE_WEB_ROOT: "https://semaphore.sqrd.link"
+        volumes:
+            - /srv/docker/volumes/semaphore/db:/var/lib/semaphore
+            - /srv/docker/volumes/semaphore/config:/etc/semaphore
+            - /srv/docker/volumes/semaphore/tmp:/tmp/semaphore
+            - /srv/docker/volumes/semaphore/ansible-collections:/etc/ansible/collections
+        secrets:
+            - semaphore_admin_pw
+            - semaphore_access_key_encryption
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.semaphore.rule=Host(`semaphore.sqrd.link`)"
+            - "traefik.http.routers.semaphore.entrypoints=websecure"
+            - "traefik.http.routers.semaphore.tls=true"
+
+networks:
+    proxy:
+        external: true
