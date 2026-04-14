@@ -1,0 +1,182 @@
+---
+# Bootstrap a fresh Ubuntu 24.04 LXC with users, SSH hardening, Docker, and
+# the standard /srv/docker directory layout.
+#
+# Proxmox-Netbox sync runs automatically after LXC creation, so the host
+# will already be in Netbox inventory by the time you run this.
+#
+# target_host is prompted via Semaphore survey at run time.
+# Set it to the Netbox hostname of the LXC you want to bootstrap.
+
+- name: Bootstrap Docker LXC
+  hosts: "{{ target_host }}"
+  become: true
+  vars:
+    ssh_key_paulus: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIlupy9c8ewWvvF2w3Y3RblR7+cdtfdfn7Bn627CClqS paulus
+    ssh_key_link: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDVtYcfzeOaidYQDS+Z/ZVfHfGgtZtieJt9yydJ3RFFm link
+
+  tasks:
+
+    # --- Base packages ---
+    - name: Update apt cache and upgrade packages
+      ansible.builtin.shell: |
+        apt-get update -qq
+        DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
+      register: apt_upgrade
+      until: apt_upgrade is succeeded
+      retries: 5
+      delay: 10
+
+    - name: Install base packages
+      ansible.builtin.apt:
+        name:
+          - curl
+          - git
+          - ca-certificates
+          - gnupg
+          - python3
+        state: present
+
+    # --- Users ---
+    - name: Create user paulus
+      ansible.builtin.user:
+        name: paulus
+        groups: sudo
+        shell: /bin/bash
+        state: present
+
+    - name: Create .ssh dir for paulus
+      ansible.builtin.file:
+        path: /home/paulus/.ssh
+        state: directory
+        owner: paulus
+        group: paulus
+        mode: '0700'
+
+    - name: Add SSH key for paulus
+      ansible.builtin.copy:
+        content: "{{ ssh_key_paulus }}\n"
+        dest: /home/paulus/.ssh/authorized_keys
+        owner: paulus
+        group: paulus
+        mode: '0600'
+
+    - name: Add paulus to sudoers (NOPASSWD)
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers.d/paulus
+        line: 'paulus ALL=(ALL) NOPASSWD: ALL'
+        state: present
+        mode: '0440'
+        create: true
+        validate: /usr/sbin/visudo -cf %s
+
+    - name: Create user link
+      ansible.builtin.user:
+        name: link
+        groups: sudo
+        shell: /bin/bash
+        state: present
+
+    - name: Create .ssh dir for link
+      ansible.builtin.file:
+        path: /home/link/.ssh
+        state: directory
+        owner: link
+        group: link
+        mode: '0700'
+
+    - name: Add SSH key for link
+      ansible.builtin.copy:
+        content: "{{ ssh_key_link }}\n"
+        dest: /home/link/.ssh/authorized_keys
+        owner: link
+        group: link
+        mode: '0600'
+
+    - name: Add link to sudoers (NOPASSWD)
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers.d/link
+        line: 'link ALL=(ALL) NOPASSWD: ALL'
+        state: present
+        mode: '0440'
+        create: true
+        validate: /usr/sbin/visudo -cf %s
+
+    # --- SSH hardening ---
+    - name: Harden SSH config
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^{{ item.regexp }}'
+        line: "{{ item.line }}"
+        state: present
+        backup: true
+      loop:
+        - { regexp: 'PasswordAuthentication', line: 'PasswordAuthentication no' }
+        - { regexp: 'PermitRootLogin', line: 'PermitRootLogin no' }
+      notify: Restart SSH
+
+    # --- Docker (Ubuntu/apt) ---
+    - name: Add Docker GPG key
+      ansible.builtin.shell: |
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+          | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        chmod a+r /etc/apt/keyrings/docker.gpg
+      args:
+        creates: /etc/apt/keyrings/docker.gpg
+
+    - name: Add Docker apt repository
+      ansible.builtin.shell: |
+        echo \
+          "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+          https://download.docker.com/linux/ubuntu \
+          $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+          | tee /etc/apt/sources.list.d/docker.list > /dev/null
+        apt-get update -qq
+      args:
+        creates: /etc/apt/sources.list.d/docker.list
+
+    - name: Install Docker packages
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          # Pin to known working version — containerd.io 1.7.28-2 breaks Docker
+          # in unprivileged LXCs with net.ipv4.ip_unprivileged_port_start error
+          - containerd.io=1.7.28-1~ubuntu.24.04~noble
+          - docker-compose-plugin
+        state: present
+      notify: Start and enable Docker
+
+    # --- Directory layout ---
+    - name: Create standard Docker directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /srv/docker/compose
+        - /srv/docker/volumes
+
+    # --- Reboot if needed ---
+    - name: Check if reboot is required
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+
+    - name: Reboot if required
+      ansible.builtin.reboot:
+        reboot_timeout: 300
+      when: reboot_required.stat.exists
+
+  handlers:
+    - name: Restart SSH
+      ansible.builtin.service:
+        name: ssh
+        state: restarted
+
+    - name: Start and enable Docker
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true

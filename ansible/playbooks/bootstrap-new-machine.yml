@@ -1,0 +1,77 @@
+---
+# Older bootstrap playbook — superseded by bootstrap-docker-lxc.yml
+# Kept for reference. Uses SQRD.yml vault for secrets.
+
+- name: bootstrap new machine
+  hosts: all
+  become: yes
+  vars:
+    ssh_key_paulus: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIlupy9c8ewWvvF2w3Y3RblR7+cdtfdfn7Bn627CClqS paulus
+    ssh_key_link: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDVtYcfzeOaidYQDS+Z/ZVfHfGgtZtieJt9yydJ3RFFm link
+
+  tasks:
+    - name: upgrade all packages using apt
+      ansible.builtin.apt:
+        name: "*"
+        state: latest
+
+    - name: Create user paulus
+      ansible.builtin.user:
+        name: paulus
+        group: sudo
+        state: present
+
+    - name: add ssh key for paulus
+      ansible.posix.authorized_key:
+        user: paulus
+        key: "{{ ssh_key_paulus }}"
+        state: present
+
+    - name: Add user paulus to sudoers (NOPASSWD)
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers.d/paulus
+        line: 'paulus ALL=(ALL) NOPASSWD: ALL'
+        state: present
+        mode: '0440'
+        create: yes
+        validate: /usr/sbin/visudo -cf %s
+
+    - name: Create user link
+      ansible.builtin.user:
+        name: link
+        group: sudo
+        state: present
+
+    - name: add ssh key for link
+      ansible.posix.authorized_key:
+        user: link
+        key: "{{ ssh_key_link }}"
+        state: present
+
+    - name: Add user link to sudoers (NOPASSWD)
+      ansible.builtin.lineinfile:
+        path: /etc/sudoers.d/link
+        line: 'link ALL=(ALL) NOPASSWD: ALL'
+        state: present
+        mode: '0440'
+        create: yes
+        validate: /usr/sbin/visudo -cf %s
+
+    - name: Disable Password Authentication and Root Login
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^{{ item.regexp }}'
+        line: "{{ item.line }}"
+        state: present
+        backup: yes
+      loop:
+        - { regexp: 'PasswordAuthentication', line: "PasswordAuthentication no" }
+        - { regexp: 'PermitRootLogin', line: "PermitRootLogin no" }
+      notify:
+        - restart ssh
+
+  handlers:
+    - name: restart ssh
+      ansible.builtin.service:
+        name: ssh
+        state: restarted

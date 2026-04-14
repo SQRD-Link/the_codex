@@ -1,0 +1,121 @@
+---
+# Deploy Pangolin on a fresh Ubuntu 24.04 LXC.
+# This playbook is fully self-contained — no dependency on bootstrap-docker-lxc.yml
+# having completed successfully.
+#
+# Prerequisites:
+#   - Backup restored to /srv/docker/volumes/pangolin/config/
+#     scp pangolin-backup.tar.gz link@<host>:/tmp/
+#     ssh link@<host> "sudo mkdir -p /srv/docker/volumes/pangolin && sudo tar xzf /tmp/pangolin-backup.tar.gz -C /srv/docker/volumes/pangolin/"
+#
+# Required variables in Semaphore homelab variable group:
+#   cf_dns_api_token   — Cloudflare API token for DNS challenge
+#   github_token       — GitHub PAT with read access to the_sanctum (repo scope)
+#
+# target_host is prompted via Semaphore survey at run time.
+
+- name: Deploy Pangolin
+  hosts: "{{ target_host }}"
+  become: true
+
+  vars:
+    sanctum_repo: "https://{{ github_token }}@github.com/SQRD-Link/the_sanctum.git"
+    compose_dir: /srv/docker/compose/the_sanctum
+    pangolin_dir: /srv/docker/compose/the_sanctum/pangolin
+    volumes_dir: /srv/docker/volumes/pangolin
+
+  tasks:
+
+    - name: Install base packages
+      ansible.builtin.apt:
+        name:
+          - git
+          - curl
+          - ca-certificates
+          - gnupg
+        state: present
+        update_cache: true
+
+    - name: Add Docker GPG key
+      ansible.builtin.shell: |
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+          | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        chmod a+r /etc/apt/keyrings/docker.gpg
+      args:
+        creates: /etc/apt/keyrings/docker.gpg
+
+    - name: Add Docker apt repository
+      ansible.builtin.shell: |
+        echo \
+          "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+          https://download.docker.com/linux/ubuntu \
+          $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+          | tee /etc/apt/sources.list.d/docker.list > /dev/null
+        apt-get update -qq
+      args:
+        creates: /etc/apt/sources.list.d/docker.list
+
+    - name: Install Docker packages
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          # Pin to known working version — containerd.io 1.7.28-2 breaks Docker
+          # in unprivileged LXCs with net.ipv4.ip_unprivileged_port_start error
+          - containerd.io=1.7.28-1~ubuntu.24.04~noble
+          - docker-compose-plugin
+        state: present
+
+    - name: Start and enable Docker
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Create standard Docker directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /srv/docker/compose
+        - /srv/docker/volumes
+
+    - name: Clone the_sanctum repo
+      ansible.builtin.git:
+        repo: "{{ sanctum_repo }}"
+        dest: "{{ compose_dir }}"
+        version: main
+        accept_hostkey: true
+        force: true
+
+    - name: Write .env file
+      ansible.builtin.copy:
+        dest: "{{ pangolin_dir }}/.env"
+        owner: root
+        group: root
+        mode: '0600'
+        content: |
+          CF_DNS_API_TOKEN={{ cf_dns_api_token }}
+
+    - name: Ensure Pangolin volume directory exists
+      ansible.builtin.file:
+        path: "{{ volumes_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Start Pangolin via docker compose
+      ansible.builtin.shell: |
+        docker compose up -d
+      args:
+        chdir: "{{ pangolin_dir }}"
+
+    - name: Wait for Pangolin API to respond
+      ansible.builtin.uri:
+        url: http://localhost:3001/api/v1/
+        status_code: 200
+      register: pangolin_health
+      until: pangolin_health.status == 200
+      retries: 15
+      delay: 10

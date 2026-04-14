@@ -1,0 +1,3 @@
+ansible_user: paulus
+ansible_become: true
+ansible_become_method: sudo

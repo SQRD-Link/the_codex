@@ -1,0 +1,12 @@
+---
+plugin: netbox.netbox.nb_inventory
+api_endpoint: "http://netbox:8080"
+token: "{{ lookup('env', 'NETBOX_TOKEN') }}"
+validate_certs: false
+query_filters:
+  - status: active
+
+compose:
+  ansible_host: primary_ip4.address | ansible.utils.ipaddr('address')
+group_by:
+  - tags
