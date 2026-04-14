@@ -1,10 +1,11 @@
 services:
   survival-online:
-    image: itzg/minecraft-server:latest
+    image: itzg/minecraft-server:java21
     container_name: minecraft-survival-online
     restart: unless-stopped
     environment:
       EULA: "TRUE"
+      VERSION: "1.21.11"   # pinned — do not change without testing world compatibility
       INIT_MEMORY: 1G
       MAX_MEMORY: 4G
       TZ: Europe/Amsterdam
