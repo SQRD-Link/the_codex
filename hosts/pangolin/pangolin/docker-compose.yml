@@ -1,0 +1,60 @@
+name: pangolin
+
+services:
+  pangolin:
+    image: fosrl/pangolin:latest
+    container_name: pangolin
+    restart: unless-stopped
+    volumes:
+      - /srv/docker/volumes/pangolin/config:/app/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/v1/"]
+      interval: "10s"
+      timeout: "10s"
+      retries: 15
+
+  gerbil:
+    image: fosrl/gerbil:latest
+    container_name: gerbil
+    restart: unless-stopped
+    depends_on:
+      pangolin:
+        condition: service_healthy
+    command:
+      - --reachableAt=http://gerbil:3003
+      - --generateAndSaveKeyTo=/var/config/key
+      - --remoteConfig=http://pangolin:3001/api/v1/gerbil/get-config
+      - --reportBandwidthTo=http://pangolin:3001/api/v1/gerbil/receive-bandwidth
+    volumes:
+      - /srv/docker/volumes/pangolin/config:/var/config
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    ports:
+      - 51820:51820/udp
+      - 443:443
+      - 80:80
+
+  traefik:
+    image: traefik:v3.4.0  # pinned - latest has memory leak with Pangolin
+    container_name: traefik
+    restart: unless-stopped
+    network_mode: service:gerbil # Ports appear on the gerbil service
+    mem_limit: 512m
+    memswap_limit: 512m
+    depends_on:
+      pangolin:
+        condition: service_healthy
+    command:
+      - --configFile=/etc/traefik/traefik_config.yml
+    environment:
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+    volumes:
+      - /srv/docker/volumes/pangolin/config/traefik:/etc/traefik:ro
+      - /srv/docker/volumes/pangolin/config/letsencrypt:/letsencrypt
+      - /srv/docker/volumes/pangolin/config/traefik/logs:/var/log/traefik
+
+networks:
+  default:
+    driver: bridge
+    name: pangolin
