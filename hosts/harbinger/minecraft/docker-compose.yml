@@ -1,13 +1,18 @@
 services:
-  minecraft-survival-online:
+  survival-online:
     image: itzg/minecraft-server:latest
     container_name: minecraft-survival-online
     restart: unless-stopped
     environment:
-      - EULA=TRUE
-      - TZ=Europe/Amsterdam
+      EULA: "TRUE"
+      INIT_MEMORY: 1G
+      MAX_MEMORY: 4G
+      TZ: Europe/Amsterdam
     volumes:
-      - /srv/docker/volumes/minecraft/survival-online:/data
+      # World data — DO NOT move without migrating /home/link/minecraft/survival-online/
+      - /home/link/minecraft/survival-online:/data
+      - /home/link/minecraft/survival-online/mods:/data/mods
+      - /home/link/minecraft/survival-online/config:/data/config
     ports:
       - "25567:25565"
-      - "24454:24454/udp"  # Voice chat (Simple Voice Chat mod)
+      - "24454:24454/udp"  # Simple Voice Chat mod

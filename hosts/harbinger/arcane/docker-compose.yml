@@ -1,18 +1,20 @@
+# Arcane headless agent for harbinger
+# Connects outbound to Arcane manager on centuries (arcane.sqrd.link)
+# No inbound port needed — uses EDGE_TRANSPORT=poll
+#
+# Setup:
+#   1. In Arcane on centuries: Environments → Add Environment → Edge tab
+#   2. Generate agent config, copy AGENT_TOKEN
+#   3. Add AGENT_TOKEN to .env here
 services:
-    arcane:
-        image: ghcr.io/getarcaneapp/arcane:latest
-        container_name: arcane
-        restart: unless-stopped
-        volumes:
-            - /var/run/docker.sock:/var/run/docker.sock:ro
-            - /srv/docker/volumes/arcane/data:/app/data
-        environment:
-            - PUID=1000
-            - PGID=1000
-            - TZ=Europe/Amsterdam
-            - APP_URL=https://harbinger.prtsr.nl
-            - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-            - JWT_SECRET=${JWT_SECRET}
-            - DATABASE_URL=file:data/arcane.db?_pragma=journal_mode(WAL)&_pragma=busy_timeout(2500)&_txlock=immediate
-        ports:
-            - "3552:3552"
+  arcane-agent:
+    image: ghcr.io/getarcaneapp/arcane-headless:latest
+    container_name: arcane-agent
+    restart: unless-stopped
+    environment:
+      - EDGE_AGENT=true
+      - EDGE_TRANSPORT=poll
+      - AGENT_TOKEN=${AGENT_TOKEN}
+      - MANAGER_API_URL=https://arcane.sqrd.link
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
