@@ -1,15 +1,13 @@
 # Arcane headless agent for harbinger
-# Connects outbound to Arcane manager on centuries (arcane.sqrd.link)
+# Connects back to Arcane manager on centuries via Pangolin tunnel
 #
 # Setup:
-#   1. On harbinger, generate a bootstrap token:
-#      docker run --rm ghcr.io/getarcaneapp/arcane-headless:latest /app/arcane generate secret
-#   2. Add AGENT_BOOTSTRAP_TOKEN to .env
-#   3. Start the agent: docker compose up -d
-#   4. In Arcane on centuries: Environments → Add Environment
+#   1. In Arcane on centuries: Environments → Add Environment
 #      - Name: harbinger
 #      - API URL: http://91.98.164.136:3553
-#      - Bootstrap Token: (the token from step 1)
+#      - Click Add Environment → copy the generated AGENT_TOKEN
+#   2. Add AGENT_TOKEN to .env
+#   3. docker compose up -d
 
 services:
   arcane-agent:
@@ -17,11 +15,12 @@ services:
     container_name: arcane-agent
     restart: unless-stopped
     ports:
-      - "3553:3553"  # Required for manager to reach the agent
+      - "3553:3553"  # Manager reaches agent on this port
     environment:
       - AGENT_MODE=true
       - EDGE_TRANSPORT=poll
-      - AGENT_BOOTSTRAP_TOKEN=${AGENT_BOOTSTRAP_TOKEN}
+      - AGENT_TOKEN=${AGENT_TOKEN}
+      - MANAGER_API_URL=https://docker.sqrd.link  # Reachable via Pangolin/Newt tunnel
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - agent-data:/app/data
