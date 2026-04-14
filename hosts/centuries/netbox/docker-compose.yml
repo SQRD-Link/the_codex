@@ -28,6 +28,7 @@ services:
             - REDIS_CACHE_PORT=6379
             - REDIS_DATABASE=0
             - REDIS_CACHE_DATABASE=1
+            - API_TOKEN_PEPPER_1=${API_TOKEN_PEPPER_1}
         labels:
             - "traefik.enable=true"
             - "traefik.http.routers.netbox-app.rule=Host(`netbox.sqrd.link`)"
