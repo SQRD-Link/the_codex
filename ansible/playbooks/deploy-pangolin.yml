@@ -10,7 +10,7 @@
 #
 # Required variables in Semaphore homelab variable group:
 #   cf_dns_api_token   — Cloudflare API token for DNS challenge
-#   github_token       — GitHub PAT with read access to the_sanctum (repo scope)
+#   github_token       — GitHub PAT with read access to the_codex (repo scope)
 #
 # target_host is prompted via Semaphore survey at run time.
 
@@ -19,9 +19,9 @@
   become: true
 
   vars:
-    sanctum_repo: "https://{{ github_token }}@github.com/SQRD-Link/the_sanctum.git"
-    compose_dir: /srv/docker/compose/the_sanctum
-    pangolin_dir: /srv/docker/compose/the_sanctum/pangolin
+    codex_repo: "https://{{ github_token }}@github.com/SQRD-Link/the_codex.git"
+    compose_dir: /srv/docker/compose/the_codex
+    pangolin_dir: /srv/docker/compose/the_codex/hosts/pangolin/pangolin
     volumes_dir: /srv/docker/volumes/pangolin
 
   tasks:
@@ -82,11 +82,11 @@
         - /srv/docker/compose
         - /srv/docker/volumes
 
-    - name: Clone the_sanctum repo
+    - name: Clone the_codex repo
       ansible.builtin.git:
-        repo: "{{ sanctum_repo }}"
+        repo: "{{ codex_repo }}"
         dest: "{{ compose_dir }}"
-        version: main
+        version: master
         accept_hostkey: true
         force: true
 
