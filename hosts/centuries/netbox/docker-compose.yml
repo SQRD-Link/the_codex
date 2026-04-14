@@ -19,7 +19,7 @@ services:
             - DB_HOST=postgres
             - REDIS_PASSWORD=${REDIS_PASSWORD}
             - REDIS_CACHE_PASSWORD=${REDIS_CACHE_PASSWORD}
-            - WEB_WORKERS=4
+            - WEB_WORKERS=2
             - GRAPHQL_ENABLED=true
             - DB_PORT=5432
             - REDIS_HOST=redis-task
