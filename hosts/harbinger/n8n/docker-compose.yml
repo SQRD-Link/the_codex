@@ -14,5 +14,10 @@ services:
       - N8N_VERSION_NOTIFICATIONS_ENABLED=false
     volumes:
       - /srv/docker/volumes/n8n:/home/node/.n8n
-    ports:
-      - "5678:5678"  # Routed via Pangolin, no Traefik on harbinger
+    networks:
+      - pangolin
+
+networks:
+  pangolin:
+    external: true
+    name: pangolin
