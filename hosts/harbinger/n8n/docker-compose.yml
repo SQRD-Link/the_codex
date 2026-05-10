@@ -12,6 +12,7 @@ services:
       - WEBHOOK_URL=https://n8n.prtsr.nl/
       - N8N_DIAGNOSTICS_ENABLED=false
       - N8N_VERSION_NOTIFICATIONS_ENABLED=false
+      - NODE_FUNCTION_ALLOW_EXTERNAL=picnic-api
     volumes:
       - /srv/docker/volumes/n8n:/home/node/.n8n
     networks:
