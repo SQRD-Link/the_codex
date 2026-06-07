@@ -68,6 +68,23 @@ services:
       networks:
         - proxy
     # ================================
+    # RECYCLARR
+    # ================================
+    recyclarr:
+        image: ghcr.io/recyclarr/recyclarr:latest
+        container_name: recyclarr
+        user: "3001:3001"
+        volumes:
+            - /srv/docker/volumes/recyclarr/config:/config
+        environment:
+            - TZ=Europe/Amsterdam
+            - RADARR_API_KEY=${RADARR_API_KEY}
+            - SONARR_API_KEY=${SONARR_API_KEY}
+        restart: unless-stopped
+        networks:
+            - proxy
+
+    # ================================
     # SONARR
     # ================================
     sonarr:
@@ -119,31 +136,31 @@ services:
         networks:
             - proxy
 
-    #    # ================================
-    #    # LIDARR
-    #    # ================================
-    #    lidarr:
-    #        image: lscr.io/linuxserver/lidarr:latest
-    #        container_name: lidarr
-    #        restart: unless-stopped
-    #        environment:
-    #            - PUID=3001
-    #            - PGID=3001
-    #            - TZ=Europe/Amsterdam
-    #        volumes:
-    #            - /srv/docker/volumes/lidarr/config:/config
-    #            - /data/media/music:/music
-    #            - /data/media/downloads:/downloads
-    #        labels:
-    #            - "traefik.enable=true"
-    #            - "traefik.docker.network=proxy"
-    #            - "traefik.http.routers.lidarr.rule=Host(`lidarr.sqrd.link`)"
-    #            - "traefik.http.routers.lidarr.entrypoints=websecure"
-    #            - "traefik.http.routers.lidarr.tls=true"
-    #            - "traefik.http.routers.lidarr.tls.certresolver=cf"
-    #            - "traefik.http.services.lidarr.loadbalancer.server.port=8686"
-    #        networks:
-    #            - proxy
+    # ================================
+    # LIDARR
+    # ================================
+    lidarr:
+        image: lscr.io/linuxserver/lidarr:latest
+        container_name: lidarr
+        restart: unless-stopped
+        environment:
+            - PUID=3001
+            - PGID=3001
+            - TZ=Europe/Amsterdam
+        volumes:
+            - /srv/docker/volumes/lidarr/config:/config
+            - /data/media/music:/music
+            - /data/media/downloads:/downloads
+        labels:
+            - "traefik.enable=true"
+            - "traefik.docker.network=proxy"
+            - "traefik.http.routers.lidarr.rule=Host(`lidarr.sqrd.link`)"
+            - "traefik.http.routers.lidarr.entrypoints=websecure"
+            - "traefik.http.routers.lidarr.tls=true"
+            - "traefik.http.routers.lidarr.tls.certresolver=cf"
+            - "traefik.http.services.lidarr.loadbalancer.server.port=8686"
+        networks:
+            - proxy
 
     # ================================
     # BAZARR
@@ -261,6 +278,37 @@ services:
             - "traefik.http.services.sabnzbd.loadbalancer.server.port=8080"
         networks:
             - proxy
+
+    # ================================
+    # SPOTTARR - Spotnet Newznab Indexer
+    # ================================
+    spottarr:
+        image: ghcr.io/spottarr/spottarr:latest
+        container_name: spottarr
+        user: "3001:3001"
+        environment:
+            - TZ=Europe/Amsterdam
+            - USENET__HOSTNAME=${SPOTTARR_USENET_HOST}
+            - USENET__USERNAME=${SPOTTARR_USENET_USER}
+            - USENET__PASSWORD=${SPOTTARR_USENET_PASS}
+            - USENET__PORT=${SPOTTARR_USENET_PORT:-563}
+            - USENET__USETLS=${SPOTTARR_USENET_TLS:-true}
+            - USENET__MAXCONNECTIONS=${SPOTTARR_USENET_CONNECTIONS:-5}
+            - SPOTNET__RETRIEVEAFTER=2026-01-01T00:00:00Z
+            - NEWZNAB__APIKEY=${SPOTTARR_API_KEY}
+        volumes:
+            - /srv/docker/volumes/spottarr/data:/data
+        restart: unless-stopped
+        networks:
+            - proxy
+        labels:
+            - "traefik.enable=true"
+            - "traefik.docker.network=proxy"
+            - "traefik.http.routers.spottarr.rule=Host(`spottarr.sqrd.link`)"
+            - "traefik.http.routers.spottarr.entrypoints=websecure"
+            - "traefik.http.routers.spottarr.tls=true"
+            - "traefik.http.routers.spottarr.tls.certresolver=cf"
+            - "traefik.http.services.spottarr.loadbalancer.server.port=8383"
 
 networks:
     proxy:
