@@ -776,6 +776,7 @@ function selectHost(id) {
     <h3>Can reach (red roads)</h3><p>${ok.length ? ok.map(esc).join(' · ') : '<em>nothing beyond its ward</em>'}</p>
     ${rulesMentioning(m, toks).length ? `<h3>Rules that name it</h3><ul>${rulesMentioning(m, toks).map(ruleLi).join('')}</ul>` : ''}
     <div class="row"><button class="quill" data-dir="out">Where can it go</button><button class="quill" data-dir="in">Who reaches it</button></div>`);
+  zoomToElement(document.querySelector(`[data-host="${CSS.escape(id)}"]`), 1.8);
 }
 
 function selectWard(id) {
@@ -792,12 +793,17 @@ function selectWard(id) {
     <p><span class="pill">${deny} denied</span><span class="pill">${unk} undocumented</span></p>
     ${rulesMentioning(m, ['vlan:' + id]).length ? `<h3>Rules that name it</h3><ul>${rulesMentioning(m, ['vlan:' + id]).map(ruleLi).join('')}</ul>` : ''}
     <div class="row"><button class="quill" data-dir="out">Where can it go</button><button class="quill" data-dir="in">Who reaches it</button></div>`);
+  zoomToElement(document.querySelector(`.ward-hit[data-ward="${CSS.escape(id)}"]`), 1.2);
 }
 
 function selectRuleGroup(label) {
   const m = state.m; clearSel();
   document.querySelectorAll(`.gear[data-rules="${CSS.escape(label)}"]`).forEach(e => e.classList.add('sel'));
-  if (label === '·') { openFolio(`<h2>The default</h2><p class="art">when no rule catches</p><p>${esc(m.policy.acl?.default_note || '')}</p><p class="lede">${esc(m.policy.acl?.source || '')}</p>`); return; }
+  if (label === '·') {
+    zoomToElement(document.querySelector(`.gear[data-rules="${CSS.escape(label)}"]`), 1.5);
+    openFolio(`<h2>The default</h2><p class="art">when no rule catches</p><p>${esc(m.policy.acl?.default_note || '')}</p><p class="lede">${esc(m.policy.acl?.source || '')}</p>`);
+    return;
+  }
   const items = (m.policy.acl?.rules || []).filter(r => r.rules === label);
   const toEnt = t => t.startsWith('vlan:') ? { type: 'vlan', id: t.slice(5) } : { type: 'host', id: m.norm(t.slice(5)) };
   const pairs = [];
@@ -805,6 +811,8 @@ function selectRuleGroup(label) {
   if (!state.layers.acl) { state.layers.acl = true; applyLayers(); }
   document.getElementById('map').classList.add('focus');
   drawFlows(m, pairs);
+  const flows = document.getElementById('flows');
+  zoomToElement(flows.childElementCount ? flows : document.querySelector(`.gear[data-rules="${CSS.escape(label)}"]`), 1.25);
   openFolio(`<h2>Rule ${esc(label)}</h2><p class="art">${esc(items[0].action)}</p><ul>${items.map(r => `<li><code>${r.from.map(short).map(esc).join(', ')}</code> → <code>${r.to.map(short).map(esc).join(', ')}</code>${r.ports ? ` on <code>${r.ports.join(', ')}</code>` : ''}<br><em>${esc(r.note || '')}</em>${r.verified === false ? ' <span class="pill warn">unverified</span>' : ''}</li>`).join('')}</ul><p class="lede">${esc(m.policy.acl?.source || '')}</p>`);
 }
 
@@ -812,6 +820,7 @@ function selectWorld() {
   const m = state.m; clearSel();
   const pairs = m.pfHost ? [{ src: { type: 'world' }, dst: { type: 'host', id: m.pfHost }, res: { verdict: 'permit' } }] : [];
   document.getElementById('map').classList.add('focus'); drawFlows(m, pairs);
+  zoomToElement(document.querySelector('[data-world]'), 1.6);
   const pf = m.policy.edge?.port_forwards || [];
   openFolio(`<h2>Il Mondo</h2><p class="art">the internet</p><p class="lede">${esc(m.policy.edge?.internet?.note || '')}. No VPS, no tunnel: the ER605 forwards straight in.</p>
     <h3>Port-forwards</h3><ul>${pf.map(p => `<li><code>${esc(short(p.to))}</code>: ${esc(p.ports)}. ${esc(p.note || '')}</li>`).join('')}</ul>
@@ -843,6 +852,18 @@ function openAsk() {
 // ---- pan & zoom on the viewBox
 const vb = { x: 0, y: 0, w: W, h: H };
 function setVB() { document.getElementById('map').setAttribute('viewBox', `${f(vb.x)} ${f(vb.y)} ${f(vb.w)} ${f(vb.h)}`); }
+function focusViewBox(box, padding = 1.3) {
+  if (!box || ![box.x, box.y, box.width, box.height].every(Number.isFinite) || box.width < 0 || box.height < 0 || (box.width === 0 && box.height === 0)) return;
+  const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+  const w = Math.min(W * 1.2, Math.max(W / 8, Math.max(box.width, box.height * W / H) * padding));
+  const h = w * H / W;
+  vb.x = cx - w / 2; vb.y = cy - h / 2; vb.w = w; vb.h = h;
+  setVB();
+}
+function zoomToElement(el, padding = 1.3) {
+  if (!el || typeof el.getBBox !== 'function') return;
+  focusViewBox(el.getBBox(), padding);
+}
 function toSvg(svg, cx, cy) { const r = svg.getBoundingClientRect(), s = Math.max(vb.w / r.width, vb.h / r.height), ox = (r.width - vb.w / s) / 2, oy = (r.height - vb.h / s) / 2; return [vb.x + (cx - r.left - ox) * s, vb.y + (cy - r.top - oy) * s, s]; }
 function zoomAt(svg, cx, cy, k) {
   const [x, y] = toSvg(svg, cx, cy);
