@@ -2,7 +2,6 @@ services:
   openwebui:
     image: ghcr.io/open-webui/open-webui:main
     container_name: openwebui
-    restart: unless-stopped
     env_file: .env
     environment:
       - WEBUI_AUTH=true
