@@ -1,0 +1,7 @@
+# Semaphore local config
+srv/docker/compose/semaphore/.env
+srv/docker/compose/immich/.env
+srv/docker/secrets/
+
+# Environment files
+**/.env

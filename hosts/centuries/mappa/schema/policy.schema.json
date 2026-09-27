@@ -1,0 +1,432 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "policy.schema.json",
+  "title": "Pianta della Rete: policy (hand/agent maintained)",
+  "description": "Things NetBox doesn't hold: VLAN art names, gateway ACL, DNS, edge, Tailscale, per-host overrides. Hosts themselves come from inventory.json.",
+  "type": "object",
+  "required": [
+    "meta",
+    "gateway",
+    "vlans",
+    "acl"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "ref": {
+      "type": "string",
+      "description": "vlan:<vlan id> | host:<host id> | edge:<name>",
+      "pattern": "^(vlan|host|edge):[a-z0-9][a-z0-9_-]*$"
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$"
+    }
+  },
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "meta": {
+      "type": "object",
+      "required": [
+        "title",
+        "updated"
+      ],
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "subtitle": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "updated": {
+          "type": "string",
+          "format": "date",
+          "description": "Bump whenever policy.json changes."
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 2,
+          "description": "Drawn in mirror script in the margins."
+        }
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/slug"
+        },
+        "label": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "ip_suffix": {
+          "type": "string",
+          "pattern": "^\\.\\d{1,3}$"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "vlans": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "vid",
+          "name",
+          "subnet"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/slug"
+          },
+          "vid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4094
+          },
+          "name": {
+            "type": "string"
+          },
+          "art": {
+            "type": "string",
+            "description": "Italian ward name drawn on the map."
+          },
+          "subnet": {
+            "type": "string",
+            "pattern": "^\\d{1,3}(\\.\\d{1,3}){3}/\\d{1,2}$"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "tailscale": {
+            "type": "boolean"
+          },
+          "order": {
+            "type": "integer",
+            "description": "Clockwise position. 0 sits at the top, facing the world."
+          },
+          "clients": {
+            "type": "string",
+            "description": "Label for the client-device cluster in this ward. Omit for server-only wards."
+          }
+        }
+      }
+    },
+    "aliases": {
+      "type": "object",
+      "description": "NetBox/Proxmox name (lowercase, no .sqrd.link) -> canonical host id.",
+      "additionalProperties": {
+        "$ref": "#/$defs/slug"
+      }
+    },
+    "host_overrides": {
+      "type": "object",
+      "description": "Merged over inventory hosts. Wins over NetBox for these fields.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "public": {
+            "type": "boolean",
+            "description": "Drawn as the watchtower by the gate."
+          },
+          "lean": {
+            "$ref": "#/$defs/slug",
+            "description": "VLAN id of a neighbouring ward this host tends. Draws a postern gate."
+          },
+          "note": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "hypervisor",
+              "nas",
+              "vm",
+              "lxc",
+              "container",
+              "switch",
+              "ap",
+              "device"
+            ]
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "vlan": {
+            "$ref": "#/$defs/slug",
+            "description": "Force a ward. Prefer fixing NetBox instead."
+          }
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "properties": {
+        "internet": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "cloudflare": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "domain": {
+              "type": "string"
+            },
+            "mode": {
+              "type": "string"
+            }
+          }
+        },
+        "port_forwards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "to"
+            ],
+            "properties": {
+              "to": {
+                "$ref": "#/$defs/ref"
+              },
+              "ports": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "tailscale": {
+      "type": "object",
+      "required": [
+        "host"
+      ],
+      "properties": {
+        "host": {
+          "$ref": "#/$defs/slug"
+        },
+        "routes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/slug"
+          }
+        },
+        "exit_node": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "dns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "record",
+          "target"
+        ],
+        "properties": {
+          "record": {
+            "type": "string"
+          },
+          "target": {
+            "$ref": "#/$defs/ref"
+          },
+          "value": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "dns_servers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "label",
+          "ip"
+        ],
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "host": {
+            "type": "string"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "expect": {
+      "type": "object",
+      "description": "Assertions checked by tools/sync.py. Violations become Errata on the map.",
+      "properties": {
+        "no_ansible": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "not_in_proxmox": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "vlan": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/slug"
+          }
+        }
+      }
+    },
+    "acl": {
+      "type": "object",
+      "required": [
+        "rules"
+      ],
+      "properties": {
+        "default": {
+          "enum": [
+            "permit",
+            "deny",
+            "unknown"
+          ]
+        },
+        "default_note": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "rules": {
+          "type": "array",
+          "description": "In ER605 order. First match wins, so ORDER MATTERS.",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "rules",
+              "action",
+              "from",
+              "to"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "rules": {
+                "type": "string",
+                "description": "ER605 rule number(s) as shown in Omada, e.g. \"4-6\". Rows with the same value share one gear."
+              },
+              "action": {
+                "enum": [
+                  "permit",
+                  "deny"
+                ]
+              },
+              "from": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/$defs/ref"
+                }
+              },
+              "to": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/$defs/ref"
+                }
+              },
+              "ports": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535
+                }
+              },
+              "verified": {
+                "type": "boolean",
+                "description": "false = inferred, not confirmed against the Omada UI or a curl test."
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "naming": {
+      "type": "object",
+      "description": "Naming convention, documented next to the data it governs.",
+      "properties": {
+        "theme": {
+          "type": "string"
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "names": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

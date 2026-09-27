@@ -1,0 +1,368 @@
+{
+  "$schema": "../../schema/policy.schema.json",
+  "meta": {
+    "title": "Pianta della Rete",
+    "subtitle": "The SQRD network, drawn as a fortified city",
+    "author": "per mano dell'ingegnere di casa",
+    "updated": "2026-09-26",
+    "notes": [
+      "Every road between wards passes through the citadel. There is no other way across.",
+      "The long thread (Tailscale) comes in under the walls, but the gate still judges it."
+    ]
+  },
+  "gateway": {
+    "id": "la-porta",
+    "label": "La Porta",
+    "model": "TP-Link ER605",
+    "ip_suffix": ".254",
+    "note": "Gateway ACL, first match wins, all inter-VLAN traffic"
+  },
+  "vlans": [
+    {
+      "id": "servers",
+      "vid": 100,
+      "name": "Servers",
+      "art": "Officina",
+      "subnet": "10.10.100.0/24",
+      "purpose": "LXC, VM and Docker homelab",
+      "tailscale": true,
+      "order": 0
+    },
+    {
+      "id": "iot",
+      "vid": 20,
+      "name": "IoT",
+      "art": "Congegni",
+      "subnet": "10.10.20.0/24",
+      "purpose": "Smart-home devices, blast radius contained",
+      "tailscale": false,
+      "order": 1,
+      "clients": "Hue, Nest, Wiz, cameras"
+    },
+    {
+      "id": "trusted",
+      "vid": 30,
+      "name": "Trusted",
+      "art": "Familiari",
+      "subnet": "10.10.30.0/24",
+      "purpose": "Richard's devices, casting and media gear",
+      "tailscale": false,
+      "order": 2,
+      "clients": "Richard's devices, casters"
+    },
+    {
+      "id": "mgmt",
+      "vid": 10,
+      "name": "Management",
+      "art": "Governo",
+      "subnet": "10.10.10.0/24",
+      "purpose": "Proxmox, TrueNAS, PBS, switch, APs",
+      "tailscale": true,
+      "order": 3
+    },
+    {
+      "id": "leo",
+      "vid": 50,
+      "name": "Leo",
+      "art": "Il Fanciullo",
+      "subnet": "10.10.50.0/24",
+      "purpose": "Leo's devices, SSID live 07:00 to 20:00",
+      "tailscale": false,
+      "order": 4,
+      "clients": "Leo's devices"
+    },
+    {
+      "id": "guest",
+      "vid": 40,
+      "name": "Guest",
+      "art": "Ospizio",
+      "subnet": "10.10.40.0/24",
+      "purpose": "Guest WiFi, internet only",
+      "tailscale": false,
+      "order": 5,
+      "clients": "Guest WiFi"
+    }
+  ],
+  "aliases": {
+    "fw": "la-porta",
+    "er605": "la-porta",
+    "beneden": "piano-terra",
+    "ap-beneden": "piano-terra",
+    "boven": "piano-nobile",
+    "ap-boven": "piano-nobile",
+    "prox": "grimoire",
+    "proxy": "pangolin"
+  },
+  "host_overrides": {
+    "pangolin": {
+      "public": true,
+      "note": "Internal and public edge. Router port-forward, no VPS, no tunnel."
+    },
+    "hassanova": {
+      "lean": "iot",
+      "note": "IP sits in Servers (.100.55), but it tends the IoT ward through a postern gate (rules 7-8)."
+    },
+    "teelskeel": {
+      "lean": "guest",
+      "note": "Native tailscaled on Ubuntu LXC, not Docker. Subnet router and exit node."
+    },
+    "grimoire": {
+      "note": "Still dual-homed on 10.10.100.8 (legacy interface, not yet retired)."
+    },
+    "nastradamus": {
+      "note": "Still dual-homed on 10.10.100.12 (legacy interface, not yet retired)."
+    }
+  },
+  "edge": {
+    "internet": {
+      "label": "Il Mondo",
+      "note": "Static home IP"
+    },
+    "cloudflare": {
+      "label": "Cloudflare",
+      "domain": "prtsr.nl",
+      "mode": "DNS only, not proxied"
+    },
+    "port_forwards": [
+      {
+        "to": "host:pangolin",
+        "ports": "web + raw TCP (e.g. Minecraft)",
+        "note": "Router port-forward straight to Pangolin"
+      }
+    ]
+  },
+  "tailscale": {
+    "host": "teelskeel",
+    "routes": [
+      "servers",
+      "mgmt"
+    ],
+    "exit_node": true,
+    "note": "IoT, Trusted, Leo and Guest are deliberately not routed."
+  },
+  "dns": [
+    {
+      "record": "*.sqrd.link",
+      "target": "host:pangolin",
+      "value": "10.10.100.252",
+      "note": "Wildcard default"
+    },
+    {
+      "record": "grimoire.sqrd.link",
+      "target": "host:centuries",
+      "value": "10.10.100.75",
+      "note": "AdGuard rewrite, bypasses Pangolin on purpose"
+    },
+    {
+      "record": "nastradamus.sqrd.link",
+      "target": "host:centuries",
+      "value": "10.10.100.75",
+      "note": "AdGuard rewrite, same as above"
+    },
+    {
+      "record": "omada.sqrd.link",
+      "target": "host:nastradamus",
+      "value": "10.10.100.12:30077",
+      "note": "Omada controller"
+    },
+    {
+      "record": "*.prtsr.nl",
+      "target": "edge:cloudflare",
+      "value": "static home IP",
+      "note": "Public, DNS only (raw TCP works)"
+    }
+  ],
+  "dns_servers": [
+    {
+      "label": "AdGuard 1 (primary)",
+      "host": "adguard",
+      "ip": "10.10.100.1"
+    },
+    {
+      "label": "AdGuard 2 (secondary)",
+      "host": "nastradamus",
+      "ip": "10.10.100.2",
+      "note": "Docker on nastradamus, synced via adguardhome-sync"
+    }
+  ],
+  "acl": {
+    "default": "unknown",
+    "default_note": "No documented rule matched. The full 14-rule table lives in network.md; rule 1 is not in the compact reference.",
+    "source": "Maintained from Omada UI screenshots and curl tests. There is no ACL read API.",
+    "rules": [
+      {
+        "id": "r2-3",
+        "rules": "2-3",
+        "action": "permit",
+        "from": [
+          "vlan:iot",
+          "vlan:trusted",
+          "vlan:leo"
+        ],
+        "to": [
+          "host:pangolin"
+        ],
+        "ports": [
+          80,
+          443
+        ],
+        "verified": false,
+        "note": "The only way into Servers from client VLANs is through Pangolin. Source VLANs inferred."
+      },
+      {
+        "id": "r4-6a",
+        "rules": "4-6",
+        "action": "permit",
+        "from": [
+          "host:centuries",
+          "host:teelskeel"
+        ],
+        "to": [
+          "host:grimoire"
+        ],
+        "ports": [
+          22,
+          8006
+        ],
+        "verified": true,
+        "note": "Traefik and Tailscale reach Proxmox"
+      },
+      {
+        "id": "r4-6b",
+        "rules": "4-6",
+        "action": "permit",
+        "from": [
+          "host:centuries",
+          "host:teelskeel"
+        ],
+        "to": [
+          "host:nastradamus"
+        ],
+        "ports": [
+          22,
+          4443
+        ],
+        "verified": true,
+        "note": "Traefik and Tailscale reach TrueNAS"
+      },
+      {
+        "id": "r7-8a",
+        "rules": "7-8",
+        "action": "permit",
+        "from": [
+          "host:hassanova"
+        ],
+        "to": [
+          "vlan:iot"
+        ],
+        "verified": true,
+        "note": "Home Assistant tends the IoT ward"
+      },
+      {
+        "id": "r7-8b",
+        "rules": "7-8",
+        "action": "permit",
+        "from": [
+          "vlan:iot"
+        ],
+        "to": [
+          "host:hassanova"
+        ],
+        "verified": true,
+        "note": "IoT devices report back to Home Assistant"
+      },
+      {
+        "id": "r9-11",
+        "rules": "9-11",
+        "action": "permit",
+        "from": [
+          "vlan:leo"
+        ],
+        "to": [
+          "host:plex",
+          "host:modcaves",
+          "host:hassanova"
+        ],
+        "verified": true,
+        "note": "Leo's allow-list: Plex, Minecraft, Home Assistant"
+      },
+      {
+        "id": "r12",
+        "rules": "12",
+        "action": "permit",
+        "from": [
+          "vlan:trusted"
+        ],
+        "to": [
+          "host:hassanova"
+        ],
+        "verified": true,
+        "note": "Trusted reaches Home Assistant"
+      },
+      {
+        "id": "r13",
+        "rules": "13",
+        "action": "deny",
+        "from": [
+          "vlan:servers",
+          "vlan:iot",
+          "vlan:trusted",
+          "vlan:leo",
+          "vlan:guest"
+        ],
+        "to": [
+          "vlan:mgmt"
+        ],
+        "verified": true,
+        "note": "Nothing reaches Management, except rules 4-6"
+      },
+      {
+        "id": "r14",
+        "rules": "14",
+        "action": "deny",
+        "from": [
+          "vlan:iot",
+          "vlan:trusted",
+          "vlan:leo",
+          "vlan:guest"
+        ],
+        "to": [
+          "vlan:servers"
+        ],
+        "verified": true,
+        "note": "No direct IP into Servers from client VLANs"
+      }
+    ]
+  },
+  "expect": {
+    "no_ansible": [
+      "hassanova",
+      "grimoire",
+      "nastradamus"
+    ],
+    "not_in_proxmox": [
+      "pbs"
+    ],
+    "vlan": {
+      "grimoire": "mgmt",
+      "nastradamus": "mgmt",
+      "pbs": "mgmt",
+      "switch": "mgmt",
+      "piano-terra": "mgmt",
+      "piano-nobile": "mgmt"
+    }
+  },
+  "naming": {
+    "theme": "Nostradamus for hosts and storage; Italian (Da Vinci era) for wards, the gateway and the access points.",
+    "rules": [
+      "lowercase, hyphen-separated, hostname-safe (RFC 1123)",
+      "rename in the source that owns the name (Omada for gateway/switch/APs, Proxmox for guests, NetBox for the rest), never only in NetBox",
+      "keep the old name in policy.aliases until the Errata stop mentioning it"
+    ],
+    "names": {
+      "la-porta": "ER605 gateway. 'The gate': every road between wards passes through it",
+      "piano-terra": "EAP245 downstairs (was beneden). Ground floor of the palazzo",
+      "piano-nobile": "EAP225 upstairs (was boven). The grand first floor of the palazzo"
+    }
+  }
+}

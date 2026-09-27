@@ -1,0 +1,54 @@
+# the_codex: hosts/centuries/mappa/docker-compose.yml
+# Deployed to /srv/docker/compose/mappa/ (this folder, including site/ and tools/).
+# Reachable at https://mappa.sqrd.link
+#
+# Two containers:
+#   mappa       static nginx, serves ./site with the live data/ dir from the volume
+#   mappa-sync  copies policy.json from the repo and rebuilds inventory.json from NetBox/Proxmox/Omada
+#
+# The volume's data/ shadows site/data/ inside nginx, so the repo stays clean
+# and the generated file never has to be committed (though n8n may, for history).
+
+services:
+  mappa:
+    image: nginx:1.27-alpine
+    container_name: mappa
+    restart: unless-stopped
+    volumes:
+      - ./site:/usr/share/nginx/html:ro
+      - /srv/docker/volumes/mappa/data:/usr/share/nginx/html/data:ro
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mappa.rule=Host(`mappa.sqrd.link`)"
+      - "traefik.http.routers.mappa.entrypoints=websecure"
+      - "traefik.http.routers.mappa.tls=true"
+      - "traefik.http.routers.mappa.tls.certresolver=cf"
+      - "traefik.http.services.mappa.loadbalancer.server.port=80"
+
+  mappa-sync:
+    image: python:3.12-alpine
+    container_name: mappa-sync
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./tools:/tools:ro
+      - ./site/data:/repo-data:ro
+      - /srv/docker/volumes/mappa/data:/data
+      # optional: a read-only checkout of the_codex, for per-host service lists
+      - /srv/docker/volumes/mappa/codex:/codex:ro
+    # stdlib only, nothing to pip install. Policy is copied every run so a git pull + restart is enough.
+    command: >
+      sh -c 'while true; do
+        cp /repo-data/policy.json /data/policy.json;
+        [ -f /data/inventory.json ] || cp /repo-data/inventory.json /data/inventory.json;
+        python /tools/sync.py --policy /data/policy.json --out /data/inventory.json --codex /codex;
+        sleep $${SYNC_INTERVAL:-3600};
+      done'
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- a parchment drawing: never let browsers or extensions auto-darken it -->
+<meta name="color-scheme" content="only light">
+<meta name="darkreader-lock">
+<title>Pianta della Rete</title>
+<meta name="description" content="The SQRD homelab network drawn as a Da Vinci fortified-city plan. Rendered from data/policy.json + data/inventory.json.">
+<link rel="stylesheet" href="mappa.css">
+</head>
+<body>
+<main id="stage" aria-label="Network map">
+  <svg id="map" viewBox="0 0 2400 1700" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="map-title">
+    <title id="map-title">Pianta della Rete</title>
+  </svg>
+</main>
+
+<nav id="tools" aria-label="Map controls">
+  <div class="seal-row">
+    <button class="seal" data-layer="acl" aria-pressed="true" title="ACL roads and walls">Vie</button>
+    <button class="seal" data-layer="tailscale" aria-pressed="true" title="Tailscale tunnel">Filo</button>
+    <button class="seal" data-layer="dns" aria-pressed="false" title="DNS flags">Nomi</button>
+    <button class="seal" data-layer="svc" aria-pressed="false" title="Services per host">Opere</button>
+    <button class="seal" data-layer="notes" aria-pressed="true" title="Margin notes">Note</button>
+  </div>
+  <div class="seal-row">
+    <button class="quill" id="btn-ask">Può passare?</button>
+    <button class="quill" id="btn-reset" title="Reset view and selection">Reset</button>
+  </div>
+</nav>
+
+<aside id="folio" aria-live="polite" hidden>
+  <button id="folio-close" aria-label="Close">×</button>
+  <div id="folio-body"></div>
+</aside>
+
+<template id="tpl-ask">
+  <h2>Può passare?</h2>
+  <p class="lede">Can this reach that? The gate reads its rules top to bottom. The first rule that matches decides.</p>
+  <label>From <select id="ask-from"></select></label>
+  <label>To <select id="ask-to"></select></label>
+  <label>Port <input id="ask-port" inputmode="numeric" placeholder="any"></label>
+  <div id="ask-result"></div>
+</template>
+
+<script src="mappa.js"></script>
+</body>
+</html>

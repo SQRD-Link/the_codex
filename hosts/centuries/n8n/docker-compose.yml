@@ -55,6 +55,7 @@ services:
       - AUTH_TOKEN=${MCP_AUTH_TOKEN}
       - WEBHOOK_SECURITY_MODE=moderate
       - LOG_LEVEL=warn
+      - WEBHOOK_SECURITY_MODE=permissive
     ports:
       - "3001:3000"
     networks:
@@ -66,6 +67,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.n8n-mcp.rule=Host(`n8n-mcp.sqrd.link`)"
+      - "traefik.http.routers.n8n-mcp.entrypoints=websecure"
+      - "traefik.http.routers.n8n-mcp.tls=true"
+      - "traefik.http.services.n8n-mcp.loadbalancer.server.port=3000"
 
 networks:
   n8n-net:

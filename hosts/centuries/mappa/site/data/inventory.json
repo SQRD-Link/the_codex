@@ -1,0 +1,206 @@
+{
+  "$schema": "../../schema/inventory.schema.json",
+  "generated_at": "2026-09-26T10:20:00Z",
+  "generator": "seed, verified against NetBox 2026-09-26",
+  "sources": {
+    "netbox": false,
+    "proxmox": false,
+    "omada": false,
+    "codex": false
+  },
+  "hosts": [
+    {
+      "id": "grimoire",
+      "ip": "10.10.10.10",
+      "kind": "hypervisor",
+      "role": "Proxmox hypervisor",
+      "model": "HP EliteDesk 800 G6 mini",
+      "status": "running",
+      "legacy_ips": [
+        "10.10.100.8"
+      ],
+      "tags": [
+        "no_ansible"
+      ]
+    },
+    {
+      "id": "nastradamus",
+      "ip": "10.10.10.20",
+      "kind": "nas",
+      "role": "TrueNAS Scale",
+      "status": "running",
+      "legacy_ips": [
+        "10.10.100.12"
+      ],
+      "tags": [
+        "no_ansible"
+      ],
+      "services": [
+        "AdGuard Home 2",
+        "Omada Controller",
+        "arcane-headless"
+      ],
+      "stores": [
+        "dataverse",
+        "almanac",
+        "automatons",
+        "chronicles",
+        "visions"
+      ]
+    },
+    {
+      "id": "pbs",
+      "ip": "10.10.10.30",
+      "kind": "vm",
+      "role": "Proxmox Backup Server",
+      "parent": "nastradamus",
+      "status": "running",
+      "tags": []
+    },
+    {
+      "id": "switch",
+      "ip": "10.10.10.201",
+      "kind": "switch",
+      "role": "Switch",
+      "model": "TL-SG2008P",
+      "status": "running",
+      "tags": []
+    },
+    {
+      "id": "piano-terra",
+      "ip": "10.10.10.202",
+      "kind": "ap",
+      "role": "Access point, downstairs",
+      "model": "EAP245",
+      "status": "running",
+      "tags": []
+    },
+    {
+      "id": "piano-nobile",
+      "ip": "10.10.10.203",
+      "kind": "ap",
+      "role": "Access point, upstairs",
+      "model": "EAP225",
+      "status": "running",
+      "tags": []
+    },
+    {
+      "id": "centuries",
+      "ip": "10.10.100.75",
+      "kind": "vm",
+      "role": "Main Docker VM",
+      "parent": "grimoire",
+      "status": "running",
+      "tags": [],
+      "services": [
+        "Traefik",
+        "NetBox",
+        "Semaphore",
+        "n8n",
+        "n8n-mcp",
+        "Arcane"
+      ]
+    },
+    {
+      "id": "pangolin",
+      "ip": "10.10.100.252",
+      "kind": "lxc",
+      "role": "Reverse proxy, public + internal edge",
+      "parent": "grimoire",
+      "status": "running",
+      "tags": [],
+      "services": [
+        "Pangolin"
+      ]
+    },
+    {
+      "id": "teelskeel",
+      "ip": "10.10.100.13",
+      "kind": "lxc",
+      "role": "Tailscale subnet router",
+      "parent": "grimoire",
+      "status": "running",
+      "tags": [],
+      "services": [
+        "tailscaled"
+      ]
+    },
+    {
+      "id": "plex",
+      "ip": "10.10.100.15",
+      "kind": "lxc",
+      "role": "Plex, GPU passthrough",
+      "parent": "grimoire",
+      "status": "running",
+      "tags": [],
+      "services": [
+        "Plex"
+      ]
+    },
+    {
+      "id": "modcaves",
+      "ip": "10.10.100.40",
+      "kind": "lxc",
+      "role": "Minecraft (Docker in LXC)",
+      "parent": "grimoire",
+      "status": "running",
+      "tags": [],
+      "services": [
+        "Minecraft"
+      ]
+    },
+    {
+      "id": "hassanova",
+      "ip": "10.10.100.55",
+      "kind": "vm",
+      "role": "Home Assistant",
+      "parent": "grimoire",
+      "status": "running",
+      "tags": [
+        "no_ansible"
+      ],
+      "services": [
+        "Home Assistant"
+      ]
+    },
+    {
+      "id": "adguard",
+      "ip": "10.10.100.1",
+      "kind": "lxc",
+      "role": "AdGuard Home 1, primary DNS",
+      "parent": "grimoire",
+      "status": "running",
+      "tags": [],
+      "services": [
+        "AdGuard Home"
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "id": "iot-devices",
+      "vlan": "iot",
+      "label": "Hue, Nest, Wiz, cameras",
+      "count": null
+    },
+    {
+      "id": "trusted-devices",
+      "vlan": "trusted",
+      "label": "Richard's devices, casters",
+      "count": null
+    },
+    {
+      "id": "leo-devices",
+      "vlan": "leo",
+      "label": "Leo's devices",
+      "count": null
+    },
+    {
+      "id": "guest-devices",
+      "vlan": "guest",
+      "label": "Guest WiFi",
+      "count": null
+    }
+  ],
+  "drift": []
+}
