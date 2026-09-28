@@ -869,19 +869,20 @@ function cancelFlyTo() {
   if (flyFrame) cancelAnimationFrame(flyFrame);
   flyFrame = 0;
 }
-function flyToViewBox(target, duration = 850) {
+function flyToViewBox(target, duration = 900) {
   if (!target) return;
   cancelFlyTo();
   const start = { ...vb };
+  const startX = start.x + start.w / 2, startY = start.y + start.h / 2;
+  const targetX = target.x + target.w / 2, targetY = target.y + target.h / 2;
   let startedAt = null;
   const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   const step = now => {
     startedAt ??= now;
     const t = Math.min(1, (now - startedAt) / Math.max(1, duration)), p = ease(t);
-    vb.x = start.x + (target.x - start.x) * p;
-    vb.y = start.y + (target.y - start.y) * p;
-    vb.w = start.w + (target.w - start.w) * p;
-    vb.h = start.h + (target.h - start.h) * p;
+    const w = start.w * Math.pow(target.w / start.w, p), h = w * H / W;
+    const x = startX + (targetX - startX) * p, y = startY + (targetY - startY) * p;
+    vb.x = x - w / 2; vb.y = y - h / 2; vb.w = w; vb.h = h;
     setVB();
     if (t < 1) flyFrame = requestAnimationFrame(step);
     else flyFrame = 0;
@@ -893,10 +894,15 @@ function zoomToElement(el, padding = 1.3, duration = 850) {
   flyToViewBox(viewBoxFor(el.getBBox(), padding), duration);
 }
 function toSvg(svg, cx, cy) { const r = svg.getBoundingClientRect(), s = Math.max(vb.w / r.width, vb.h / r.height), ox = (r.width - vb.w / s) / 2, oy = (r.height - vb.h / s) / 2; return [vb.x + (cx - r.left - ox) * s, vb.y + (cy - r.top - oy) * s, s]; }
-function zoomAt(svg, cx, cy, k) {
+function viewBoxAt(svg, cx, cy, k) {
   const [x, y] = toSvg(svg, cx, cy);
   const nw = Math.min(W * 1.2, Math.max(W / 8, vb.w * k)), kk = nw / vb.w;
-  vb.x = x - (x - vb.x) * kk; vb.y = y - (y - vb.y) * kk; vb.w = nw; vb.h = vb.h * kk; setVB();
+  const nh = vb.h * kk;
+  return { x: x - (x - vb.x) * kk, y: y - (y - vb.y) * kk, w: nw, h: nh };
+}
+function zoomAt(svg, cx, cy, k) {
+  Object.assign(vb, viewBoxAt(svg, cx, cy, k));
+  setVB();
 }
 function wirePanZoom(svg) {
   svg.addEventListener('wheel', e => { e.preventDefault(); cancelFlyTo(); zoomAt(svg, e.clientX, e.clientY, Math.exp(e.deltaY * .0015)); }, { passive: false });
@@ -936,6 +942,12 @@ async function main() {
   wirePanZoom(svg);
   document.querySelectorAll('.seal').forEach(b => b.addEventListener('click', () => { state.layers[b.dataset.layer] = !state.layers[b.dataset.layer]; applyLayers(); }));
   document.getElementById('btn-ask').addEventListener('click', openAsk);
+  const zoomBy = factor => {
+    const r = svg.getBoundingClientRect();
+    flyToViewBox(viewBoxAt(svg, r.left + r.width / 2, r.top + r.height / 2, factor), 320);
+  };
+  document.getElementById('btn-zoom-in').addEventListener('click', () => zoomBy(1 / 1.4));
+  document.getElementById('btn-zoom-out').addEventListener('click', () => zoomBy(1.4));
   document.getElementById('btn-reset').addEventListener('click', () => { cancelFlyTo(); closeFolio(); Object.assign(vb, { x: 0, y: 0, w: W, h: H }); setVB(); });
   document.getElementById('folio-close').addEventListener('click', closeFolio);
   document.getElementById('folio').addEventListener('click', e => {
