@@ -43,6 +43,8 @@ text{fill:var(--ink);font-family:var(--serif)}
 .mirror{opacity:.42}
 
 /* ---------- interactive ---------- */
+.focus-target{cursor:zoom-in}
+.focus-target:focus-visible{outline:2px solid var(--sang);outline-offset:3px}
 .bldg,.ward-hit,.gear,.globe-hit{cursor:pointer}
 .bldg:hover .b-shape, .bldg.sel .b-shape{stroke:var(--sang)}
 .bldg.sel .b-name{fill:var(--sang)}
