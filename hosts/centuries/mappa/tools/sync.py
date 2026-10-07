@@ -4,6 +4,7 @@
     NetBox   -> hosts, IPs, roles, tags, parents        (required)
     Proxmox  -> lxc vs vm, running/stopped, node         (optional)
     Omada    -> client counts per VLAN                   (optional)
+    Omada    -> live gateway ACL vs policy.json drift      (optional, read-only)
     the_codex checkout -> services per host              (optional)
 
 It never touches policy.json. Anything NetBox disagrees with the policy about
@@ -198,27 +199,38 @@ def from_proxmox(hosts: list[dict], norm: Norm, drift: list, expect_missing: set
     return True
 
 
-def from_omada(policy: dict, drift: list) -> dict[str, int] | None:
+def _omada_login() -> tuple | None:
+    """(base, omadacId, siteId, auth header, verify) for the Omada Open API.
+
+    None when OMADA_* isn't configured. Raises when Omada refuses or the site is missing.
+    """
     url, oid, cid, sec = (os.environ.get(k) for k in ("OMADA_URL", "OMADA_ID", "OMADA_CLIENT_ID", "OMADA_CLIENT_SECRET"))
     if not (url and oid and cid and sec):
         return None
     verify, base = env_bool("OMADA_VERIFY_TLS"), url.rstrip("/")
+    resp = http_json(
+        f"{base}/openapi/authorize/token?grant_type=client_credentials",
+        data={"omadacId": oid, "client_id": cid, "client_secret": sec},
+        verify=verify,
+    )
+    if resp.get("errorCode") not in (0, None) or "result" not in resp:
+        raise RuntimeError(f"token request refused: errorCode {resp.get('errorCode')}, {resp.get('msg')}")
+    hdr = {"Authorization": f"AccessToken={resp['result']['accessToken']}"}
+    sites = http_json(f"{base}/openapi/v1/{oid}/sites?page=1&pageSize=100", hdr, verify=verify)["result"]["data"]
+    want = os.environ.get("OMADA_SITE")
+    site = next((x for x in sites if not want or x["name"] == want), None)
+    if not site:
+        raise RuntimeError(f"site {want!r} not found")
+    return base, oid, site["siteId"], hdr, verify
+
+
+def from_omada(policy: dict, drift: list) -> dict[str, int] | None:
     try:
-        resp = http_json(
-            f"{base}/openapi/authorize/token?grant_type=client_credentials",
-            data={"omadacId": oid, "client_id": cid, "client_secret": sec},
-            verify=verify,
-)
-        if resp.get("errorCode") not in (0, None) or "result" not in resp:
-            raise RuntimeError(f"token request refused: errorCode {resp.get('errorCode')}, {resp.get('msg')}")
-        tok = resp["result"]["accessToken"]
-        hdr = {"Authorization": f"AccessToken={tok}"}
-        sites = http_json(f"{base}/openapi/v1/{oid}/sites?page=1&pageSize=100", hdr, verify=verify)["result"]["data"]
-        want = os.environ.get("OMADA_SITE")
-        site = next((s for s in sites if not want or s["name"] == want), None)
-        if not site:
-            raise RuntimeError(f"site {want!r} not found")
-        clients = http_json(f"{base}/openapi/v1/{oid}/sites/{site['siteId']}/clients?page=1&pageSize=1000", hdr, verify=verify)["result"]["data"]
+        sess = _omada_login()
+        if sess is None:
+            return None
+        base, oid, sid, hdr, verify = sess
+        clients = http_json(f"{base}/openapi/v1/{oid}/sites/{sid}/clients?page=1&pageSize=1000", hdr, verify=verify)["result"]["data"]
     except Exception as e:  # Omada is enrichment only; never fail the sync over it
         drift.append({"severity": "info", "object": "omada", "message": f"Client counts unavailable: {e}"})
         return None
@@ -233,6 +245,127 @@ def from_omada(policy: dict, drift: list) -> dict[str, int] | None:
             if ip in net:
                 counts[vid] = counts.get(vid, 0) + 1
     return counts
+
+
+def _expand(rules: list[dict]) -> dict[tuple, frozenset | None]:
+    """Rules as {(action, src, dst): ports}. ports None means any port; refs are vlan:<id> / host:<id> / ip:<addr>."""
+    atoms: dict[tuple, set | None] = {}
+    for r in rules:
+        for src in r["from"]:
+            for dst in r["to"]:
+                key = (r["action"], src, dst)
+                ports = None if r.get("ports") is None else {str(x) for x in r["ports"]}
+                if key not in atoms:
+                    atoms[key] = ports
+                elif atoms[key] is None or ports is None:
+                    atoms[key] = None
+                else:
+                    atoms[key] |= ports
+    return {k: (None if v is None else frozenset(v)) for k, v in atoms.items()}
+
+
+def _fmt_ports(p) -> str:
+    return "any port" if p is None else "port " + ",".join(sorted(p, key=lambda x: (len(x), x)))
+
+
+def _acl_diff(policy_rules: list[dict], live_rules: list[dict]) -> list[str]:
+    """Compare by who-reaches-whom-on-which-ports. First-match order and protocol are NOT compared."""
+    pol, live = _expand(policy_rules), _expand(live_rules)
+    out: list[str] = []
+
+    def grouped(missing: dict, where: str) -> None:
+        by_ports: dict[tuple, dict[str, set]] = {}
+        for (act, src, dst), ports in missing.items():
+            by_ports.setdefault((act, ports), {}).setdefault(src, set()).add(dst)
+        for (act, ports), by_src in sorted(by_ports.items(), key=lambda kv: (kv[0][0], str(kv[0][1]))):
+            inv: dict[frozenset, list] = {}
+            for src, dsts in by_src.items():
+                inv.setdefault(frozenset(dsts), []).append(src)
+            for dsts, srcs in inv.items():
+                out.append(f"{where}: {act} {', '.join(sorted(srcs))} -> {', '.join(sorted(dsts))} ({_fmt_ports(ports)})")
+
+    grouped({k: v for k, v in live.items() if k not in pol}, "Omada has a rule policy.json lacks")
+    grouped({k: v for k, v in pol.items() if k not in live}, "policy.json has a rule Omada lacks")
+    for key in sorted(set(pol) & set(live)):
+        if pol[key] != live[key]:
+            act, src, dst = key
+            out.append(f"Ports differ for {act} {src} -> {dst}: policy.json says {_fmt_ports(pol[key])}, Omada says {_fmt_ports(live[key])}")
+    return out
+
+
+def from_omada_acl(policy: dict, hosts: list[dict], drift: list) -> bool | None:
+    """Read the live gateway ACL (Open API, GET only) and report where it disagrees with policy.acl.rules."""
+    try:
+        sess = _omada_login()
+        if sess is None:
+            return None
+        base, oid, sid, hdr, verify = sess
+        root = f"{base}/openapi/v1/{oid}/sites/{sid}"
+
+        def page(path: str) -> list[dict]:
+            res = http_json(f"{root}{path}?page=1&pageSize=1000", hdr, verify=verify)["result"]
+            return res["data"] if isinstance(res, dict) else res  # /profiles/groups/{type} returns a bare list
+
+        nets = {n["id"]: n for n in page("/lan-networks")}
+        groups = {g["groupId"]: g for t in (0, 1) for g in page(f"/profiles/groups/{t}")}
+        acls = sorted(page("/acls/osg-acls"), key=lambda r: r["index"])
+    except Exception as e:  # enrichment only; never fail the sync over it
+        drift.append({"severity": "info", "object": "omada:acl", "message": f"Live ACL unavailable: {e}"})
+        return None
+
+    vlan_by_vid = {v["vid"]: v["id"] for v in policy["vlans"]}
+    vlan_nets = [(v["id"], ipaddress.ip_network(v["subnet"])) for v in policy["vlans"]]
+    host_by_ip = {}
+    for h in hosts:
+        for ip in [h.get("ip"), *h.get("legacy_ips", [])]:
+            if ip:
+                host_by_ip[ip] = h["id"]
+
+    def ref_net(n: dict) -> str:
+        return "vlan:" + vlan_by_vid.get(n.get("vlan"), f"vid{n.get('vlan')}")
+
+    def refs_group(g: dict) -> list[str]:
+        out = []
+        for e in g.get("ipList", []):
+            ip, mask = e["ip"], e.get("mask", 32)
+            if mask == 32:
+                out.append("host:" + host_by_ip[ip] if ip in host_by_ip else f"ip:{ip}")
+            else:
+                net = ipaddress.ip_network(f"{ip}/{mask}", strict=False)
+                out.append("vlan:" + next((vid for vid, n in vlan_nets if n == net), f"net:{net}"))
+        return out
+
+    def resolve(kind: int, ids: list[str]) -> tuple[list[str], set | None]:
+        refs: list[str] = []
+        ports: set | None = None
+        for i in ids:
+            if kind == 0 and i in nets:
+                refs.append(ref_net(nets[i]))
+            elif i in groups:
+                refs += refs_group(groups[i])
+                if groups[i].get("portList"):
+                    ports = (ports or set()) | {str(x) for x in groups[i]["portList"]}
+            else:
+                refs.append(f"unknown:{i}")
+        return refs, ports
+
+    live: list[dict] = []
+    skipped = 0
+    for r in acls:
+        d = r.get("direction") or {}
+        if not r.get("status"):
+            continue
+        if not d.get("lanToLan") or d.get("lanToWan") or d.get("wanInIds") or d.get("vpnInIds"):
+            skipped += 1  # policy.json only models LAN-to-LAN
+            continue
+        src, _ = resolve(r["sourceType"], r["sourceIds"])
+        dst, ports = resolve(r["destinationType"], r["destinationIds"])
+        live.append({"action": "permit" if r["policy"] else "deny", "from": src, "to": dst, "ports": sorted(ports) if ports else None})
+    if skipped:
+        drift.append({"severity": "info", "object": "omada:acl", "message": f"{skipped} gateway ACL rule(s) are not LAN-to-LAN and were not compared."})
+    for line in _acl_diff(policy.get("acl", {}).get("rules", []), live):
+        drift.append({"severity": "warn", "object": "omada:acl", "message": line})
+    return True
 
 
 def from_codex(hosts: list[dict], codex: pathlib.Path | None) -> bool:
@@ -302,7 +435,7 @@ def main() -> int:
         return 2
     norm = Norm(policy.get("aliases", {}))
     drift: list[dict] = []
-    sources = {"netbox": False, "proxmox": False, "omada": False, "codex": False}
+    sources = {"netbox": False, "proxmox": False, "omada": False, "omada_acl": False, "codex": False}
 
     try:
         hosts, nb_vids = from_netbox(norm, drift)
@@ -318,6 +451,7 @@ def main() -> int:
         drift.append({"severity": "info", "object": "proxmox", "message": f"Unavailable: {e}"})
     counts = from_omada(policy, drift)
     sources["omada"] = counts is not None
+    sources["omada_acl"] = bool(from_omada_acl(policy, hosts, drift))
     sources["codex"] = from_codex(hosts, pathlib.Path(a.codex) if a.codex else None)
     check_policy(policy, hosts, nb_vids, drift, norm)
 

@@ -21,7 +21,7 @@ Read all of this before editing anything.
 | Client counts per VLAN | Omada | none (sync pulls it) |
 | Services on a host | `the_codex/hosts/<host>/<app>/` | none (sync lists the directories) |
 | VLANs, subnets, ward names, order | here | `site/data/policy.json` → `vlans` |
-| Gateway ACL rules | Omada UI (no API) | `policy.json` → `acl.rules` |
+| Gateway ACL rules | Omada (live, read-only via Open API) | `policy.json` → `acl.rules`. Sync only *compares* and reports drift in Errata; it never writes policy |
 | DNS records, rewrites | AdGuard / Cloudflare | `policy.json` → `dns` |
 | Port-forwards, Tailscale routes | ER605 / Tailscale admin | `policy.json` → `edge`, `tailscale` |
 | NetBox name differs from real name | here | `policy.json` → `aliases` |
@@ -42,6 +42,7 @@ Read all of this before editing anything.
 
 ### An ACL rule changed on the ER605
 
+0. If `tools/sync.py` has Omada credentials, it lists differences between Omada and `policy.acl.rules` as Errata ("Omada has a rule policy.json lacks", "Ports differ", ...). Fix `policy.json` to match Omada, or fix Omada if the policy is the intent. It compares who reaches whom on which ports. It does not compare rule order or protocol.
 1. Edit `policy.acl.rules`. **Order is evaluation order** (first match wins), so keep it identical to Omada.
 2. `rules` is the Omada rule number label. Rows that share a label are drawn as one gear.
 3. Set `verified: false` unless the change was confirmed in the Omada UI or with a curl test.
