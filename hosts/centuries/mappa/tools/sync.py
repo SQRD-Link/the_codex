@@ -400,14 +400,20 @@ def _arcane_pages(base: str, path: str, hdr: dict, verify: bool) -> list[dict]:
             return out
 
 
-def from_arcane(hosts: list[dict], norm: Norm, drift: list, codex_listed: bool = False) -> bool:
+def from_arcane(hosts: list[dict], norm: Norm, drift: list, codex_listed: bool = False, vlans: list[dict] | None = None) -> bool:
     """Running Docker Compose projects per host. One Arcane environment per host, named after the host id
-    (or an alias of it). Needs a key with environments:list (global) and containers:list only."""
+    (or an alias of it). Needs a key with environments:list (global) and containers:list only.
+
+    A running container with its own address inside a policy VLAN (a macvlan, e.g. the secondary AdGuard) is not a
+    NetBox device or VM, but ACL rules name it. It becomes a host of kind "container" on the environment's host,
+    named after the container (rename it through policy.aliases)."""
     url, key = os.environ.get("ARCANE_URL"), os.environ.get("ARCANE_API_KEY")
     if not (url and key):
         return False
     base, hdr, verify = url.rstrip("/") + "/api", {"X-Api-Key": key.strip()}, env_bool("ARCANE_VERIFY_TLS")
     by = {h["id"]: h for h in hosts}
+    known_ips = {ip for h in hosts for ip in [h.get("ip"), *h.get("legacy_ips", [])] if ip}
+    lan = [ipaddress.ip_network(v["subnet"]) for v in (vlans or [])]
     covered: set[str] = set()
     for env in _arcane_pages(base, "/environments", hdr, verify):
         if not env.get("enabled", True):
@@ -427,8 +433,22 @@ def from_arcane(hosts: list[dict], norm: Norm, drift: list, codex_listed: bool =
             if c.get("state") != "running":
                 continue
             labels = c.get("labels") or {}
-            name = labels.get("com.docker.compose.project") or (c.get("names") or ["?"])[0].lstrip("/")
+            cname = (c.get("names") or ["?"])[0].lstrip("/")
+            name = labels.get("com.docker.compose.project") or cname
             running.add(name.removeprefix("ix-"))  # TrueNAS prefixes its apps with ix-
+            for net in ((c.get("networkSettings") or {}).get("networks") or {}).values():
+                ip = net.get("ipAddress")
+                if not ip or ip in known_ips or not any(ipaddress.ip_address(ip) in n for n in lan):
+                    continue
+                cid = norm(cname)
+                if cid in by:
+                    drift.append({"severity": "info", "object": cid, "message": f"Container {cname} has LAN address {ip}, but a host with that name already exists."})
+                    continue
+                new = {"id": cid, "ip": ip, "kind": "container", "role": (c.get("image") or "").split(":")[0] or None,
+                       "parent": host_id, "status": "running", "tags": []}
+                hosts.append(new)
+                by[cid] = new
+                known_ips.add(ip)
         # only compare against the_codex when from_codex really filled services (otherwise they are seed text)
         for app in sorted(set(h.get("services", [])) - running) if codex_listed else []:
             if app.lower() in {r.lower() for r in running}:
@@ -559,12 +579,12 @@ def main() -> int:
         drift.append({"severity": "info", "object": "proxmox", "message": f"Unavailable: {e}"})
     counts = from_omada(policy, drift)
     sources["omada"] = counts is not None
-    sources["omada_acl"] = bool(from_omada_acl(policy, hosts, drift))
     sources["codex"] = from_codex(hosts, pathlib.Path(a.codex) if a.codex else None)
     try:
-        sources["arcane"] = from_arcane(hosts, norm, drift, sources["codex"])
+        sources["arcane"] = from_arcane(hosts, norm, drift, sources["codex"], policy.get("vlans"))
     except Exception as e:
         drift.append({"severity": "info", "object": "arcane", "message": f"Unavailable: {e}"})
+    sources["omada_acl"] = bool(from_omada_acl(policy, hosts, drift))
     try:
         sources["pangolin"] = from_pangolin(policy, hosts, drift)
     except Exception as e:
