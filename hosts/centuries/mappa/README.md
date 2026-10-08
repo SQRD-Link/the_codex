@@ -27,7 +27,7 @@ mappa/                         → the_codex/hosts/centuries/mappa/
 │       └── inventory.json     generated (seed included)
 ├── schema/                    JSON Schemas for both files
 └── tools/
-    ├── sync.py                NetBox + Proxmox + Omada + the_codex → inventory.json
+    ├── sync.py                NetBox + Proxmox + Omada + Arcane + the_codex → inventory.json
     ├── validate.py            schema + reference checks, run after every edit
     └── bundle.py              single-file HTML for sharing or printing
 ```

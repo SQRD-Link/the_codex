@@ -6,6 +6,7 @@
     Omada    -> client counts per VLAN                   (optional)
     Omada    -> live gateway ACL vs policy.json drift      (optional, read-only)
     the_codex checkout -> services per host              (optional)
+    Arcane   -> running compose projects per host        (optional, read-only key)
 
 It never touches policy.json. Anything NetBox disagrees with the policy about
 goes into inventory["drift"] and shows on the map as Errata. It does not get
@@ -17,6 +18,7 @@ Environment (see .env.example):
     NETBOX_URL, NETBOX_TOKEN
     PROXMOX_URL, PROXMOX_TOKEN_ID, PROXMOX_TOKEN_SECRET, PROXMOX_VERIFY_TLS=1
     OMADA_URL, OMADA_ID, OMADA_CLIENT_ID, OMADA_CLIENT_SECRET, OMADA_SITE, OMADA_VERIFY_TLS=1
+    ARCANE_URL, ARCANE_API_KEY, ARCANE_VERIFY_TLS=1
 
 Usage:
     python3 tools/sync.py [--policy site/data/policy.json] [--out site/data/inventory.json]
@@ -383,6 +385,54 @@ def from_codex(hosts: list[dict], codex: pathlib.Path | None) -> bool:
     return True
 
 
+def _arcane_pages(base: str, path: str, hdr: dict, verify: bool) -> list[dict]:
+    """GET every page of an Arcane list endpoint ({data: [...], pagination: {totalItems}})."""
+    out: list[dict] = []
+    while True:
+        sep = "&" if "?" in path else "?"
+        page = http_json(f"{base}{path}{sep}start={len(out)}&limit=100", hdr, verify=verify)
+        rows = page.get("data") or []
+        out += rows
+        total = (page.get("pagination") or {}).get("totalItems", len(out))
+        if not rows or len(out) >= total:
+            return out
+
+
+def from_arcane(hosts: list[dict], norm: Norm, drift: list) -> bool:
+    """Running Docker Compose projects per host. One Arcane environment per host, named after the host id
+    (or an alias of it). Needs a key with environments:list (global) and containers:list only."""
+    url, key = os.environ.get("ARCANE_URL"), os.environ.get("ARCANE_API_KEY")
+    if not (url and key):
+        return False
+    base, hdr, verify = url.rstrip("/") + "/api", {"X-Api-Key": key.strip()}, env_bool("ARCANE_VERIFY_TLS")
+    by = {h["id"]: h for h in hosts}
+    covered: set[str] = set()
+    for env in _arcane_pages(base, "/environments", hdr, verify):
+        if not env.get("enabled", True):
+            continue
+        host_id = norm(env.get("name") or env["id"])
+        h = by.get(host_id)
+        if not h:
+            drift.append({"severity": "warn", "object": str(env.get("name") or env["id"]), "message": "Arcane environment matches no host. Name it after the host id, or add it to policy.aliases."})
+            continue
+        try:
+            rows = _arcane_pages(base, f"/environments/{env['id']}/containers", hdr, verify)
+        except Exception as e:  # one unreachable agent must not hide the rest
+            drift.append({"severity": "info", "object": host_id, "message": f"Arcane could not list containers: {e}"})
+            continue
+        running: set[str] = set()
+        for c in rows:
+            if c.get("state") != "running":
+                continue
+            labels = c.get("labels") or {}
+            running.add(labels.get("com.docker.compose.project") or (c.get("names") or ["?"])[0].lstrip("/"))
+        for app in sorted(set(h.get("services", [])) - running):
+            drift.append({"severity": "info", "object": host_id, "message": f"{app} is in the_codex but not running according to Arcane."})
+        h["services"] = sorted(running)
+        covered.add(host_id)
+    return bool(covered)
+
+
 # ---------------------------------------------------------------- checks
 def check_policy(policy: dict, hosts: list[dict], nb_vids: set[int] | None, drift: list, norm: Norm) -> None:
     nets = [(v["id"], ipaddress.ip_network(v["subnet"])) for v in policy["vlans"]]
@@ -435,7 +485,7 @@ def main() -> int:
         return 2
     norm = Norm(policy.get("aliases", {}))
     drift: list[dict] = []
-    sources = {"netbox": False, "proxmox": False, "omada": False, "omada_acl": False, "codex": False}
+    sources = {"netbox": False, "proxmox": False, "omada": False, "omada_acl": False, "codex": False, "arcane": False}
 
     try:
         hosts, nb_vids = from_netbox(norm, drift)
@@ -453,6 +503,10 @@ def main() -> int:
     sources["omada"] = counts is not None
     sources["omada_acl"] = bool(from_omada_acl(policy, hosts, drift))
     sources["codex"] = from_codex(hosts, pathlib.Path(a.codex) if a.codex else None)
+    try:
+        sources["arcane"] = from_arcane(hosts, norm, drift)
+    except Exception as e:
+        drift.append({"severity": "info", "object": "arcane", "message": f"Unavailable: {e}"})
     check_policy(policy, hosts, nb_vids, drift, norm)
 
     clients = [
