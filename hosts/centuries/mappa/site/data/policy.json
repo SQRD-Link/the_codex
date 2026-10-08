@@ -162,8 +162,8 @@
     {
       "record": "omada.sqrd.link",
       "target": "host:nastradamus",
-      "value": "10.10.100.12:30077",
-      "note": "Omada controller"
+      "value": "10.10.10.20:30077",
+      "note": "Omada controller on nastradamus. Resolves through the wildcard to Pangolin, which proxies to the controller"
     },
     {
       "record": "*.prtsr.nl",
