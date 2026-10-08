@@ -4,7 +4,7 @@
     "title": "Pianta della Rete",
     "subtitle": "The SQRD network, drawn as a fortified city",
     "author": "per mano dell'ingegnere di casa",
-    "updated": "2026-09-26",
+    "updated": "2026-10-08",
     "notes": [
       "Every road between wards passes through the citadel. There is no other way across.",
       "The long thread (Tailscale) comes in under the walls, but the gate still judges it."
@@ -187,31 +187,82 @@
   ],
   "acl": {
     "default": "unknown",
-    "default_note": "No documented rule matched. The full 14-rule table lives in network.md; rule 1 is not in the compact reference.",
-    "source": "Maintained from Omada UI screenshots and curl tests. There is no ACL read API.",
+    "default_note": "All 16 gateway rules are listed in Omada order. Traffic that matches none of them is not documented.",
+    "source": "Omada live gateway ACL, read through the Open API (GET). Omada is the source of truth; sync.py only compares and reports drift.",
     "rules": [
       {
-        "id": "r2-3",
-        "rules": "2-3",
+        "id": "r1",
+        "rules": "1",
         "action": "permit",
         "from": [
+          "vlan:servers",
+          "vlan:mgmt",
           "vlan:iot",
           "vlan:trusted",
-          "vlan:leo"
+          "vlan:leo",
+          "vlan:guest"
+        ],
+        "to": [
+          "host:adguard"
+        ],
+        "verified": true,
+        "note": "Omada 'allow all-vlans > dns'. The group also holds the secondary resolver 10.10.100.2 (AdGuard on nastradamus), which has no host record, so sync still lists it as an ip: difference"
+      },
+      {
+        "id": "r2",
+        "rules": "2",
+        "action": "permit",
+        "from": [
+          "vlan:servers",
+          "vlan:mgmt",
+          "vlan:trusted",
+          "vlan:leo",
+          "vlan:guest"
         ],
         "to": [
           "host:pangolin"
         ],
-        "ports": [
-          80,
-          443
-        ],
-        "verified": false,
-        "note": "The only way into Servers from client VLANs is through Pangolin. Source VLANs inferred."
+        "verified": true,
+        "note": "Omada 'allow servers,mgmt,trusted,leo,guest > pangolin', any port. IoT is deliberately not a source"
       },
       {
-        "id": "r4-6a",
-        "rules": "4-6",
+        "id": "r3",
+        "rules": "3",
+        "action": "permit",
+        "from": [
+          "host:pangolin"
+        ],
+        "to": [
+          "vlan:servers",
+          "vlan:mgmt",
+          "vlan:iot",
+          "vlan:trusted",
+          "vlan:leo",
+          "vlan:guest"
+        ],
+        "verified": true,
+        "note": "Omada 'allow pangolin > all-vlans'. Pangolin reaches every VLAN"
+      },
+      {
+        "id": "r4",
+        "rules": "4",
+        "action": "permit",
+        "from": [
+          "host:centuries"
+        ],
+        "to": [
+          "host:grimoire",
+          "host:nastradamus"
+        ],
+        "ports": [
+          22
+        ],
+        "verified": true,
+        "note": "Omada 'allow centuries > mgmt-ssh'. SSH into Management only from centuries"
+      },
+      {
+        "id": "r5",
+        "rules": "5",
         "action": "permit",
         "from": [
           "host:centuries",
@@ -221,15 +272,14 @@
           "host:grimoire"
         ],
         "ports": [
-          22,
           8006
         ],
         "verified": true,
-        "note": "Traefik and Tailscale reach Proxmox"
+        "note": "Omada 'allow centuries,tailscale > grimoire-pve'. Proxmox web UI"
       },
       {
-        "id": "r4-6b",
-        "rules": "4-6",
+        "id": "r6",
+        "rules": "6",
         "action": "permit",
         "from": [
           "host:centuries",
@@ -239,15 +289,14 @@
           "host:nastradamus"
         ],
         "ports": [
-          22,
           4443
         ],
         "verified": true,
-        "note": "Traefik and Tailscale reach TrueNAS"
+        "note": "Omada 'allow centuries,tailscale > nastradamus-truenas'. TrueNAS web UI"
       },
       {
-        "id": "r7-8a",
-        "rules": "7-8",
+        "id": "r7",
+        "rules": "7",
         "action": "permit",
         "from": [
           "host:hassanova"
@@ -256,11 +305,11 @@
           "vlan:iot"
         ],
         "verified": true,
-        "note": "Home Assistant tends the IoT ward"
+        "note": "Omada 'allow homeassistant > iot'. Home Assistant tends the IoT ward"
       },
       {
-        "id": "r7-8b",
-        "rules": "7-8",
+        "id": "r8",
+        "rules": "8",
         "action": "permit",
         "from": [
           "vlan:iot"
@@ -269,26 +318,85 @@
           "host:hassanova"
         ],
         "verified": true,
-        "note": "IoT devices report back to Home Assistant"
+        "note": "Omada 'allow iot > homeassistant'. IoT devices report back to Home Assistant"
       },
       {
-        "id": "r9-11",
-        "rules": "9-11",
+        "id": "r9",
+        "rules": "9",
+        "action": "permit",
+        "from": [
+          "vlan:trusted"
+        ],
+        "to": [
+          "host:plex"
+        ],
+        "ports": [
+          32400
+        ],
+        "verified": true,
+        "note": "Omada 'allow trusted > plex'"
+      },
+      {
+        "id": "r10",
+        "rules": "10",
+        "action": "permit",
+        "from": [
+          "host:plex"
+        ],
+        "to": [
+          "host:nastradamus"
+        ],
+        "ports": [
+          2049
+        ],
+        "verified": true,
+        "note": "Omada 'allow plex > nastradamus-nfs'. NFS media share"
+      },
+      {
+        "id": "r11",
+        "rules": "11",
         "action": "permit",
         "from": [
           "vlan:leo"
         ],
         "to": [
-          "host:plex",
-          "host:modcaves",
-          "host:hassanova"
+          "host:plex"
+        ],
+        "ports": [
+          32400
         ],
         "verified": true,
-        "note": "Leo's allow-list: Plex, Minecraft, Home Assistant"
+        "note": "Omada 'allow leo > plex'"
       },
       {
         "id": "r12",
         "rules": "12",
+        "action": "permit",
+        "from": [
+          "vlan:leo"
+        ],
+        "to": [
+          "host:modcaves"
+        ],
+        "verified": true,
+        "note": "Omada 'allow leo > minecraft'"
+      },
+      {
+        "id": "r13",
+        "rules": "13",
+        "action": "permit",
+        "from": [
+          "vlan:leo"
+        ],
+        "to": [
+          "host:hassanova"
+        ],
+        "verified": true,
+        "note": "Omada 'allow leo > homeassistant'"
+      },
+      {
+        "id": "r14",
+        "rules": "14",
         "action": "permit",
         "from": [
           "vlan:trusted"
@@ -297,11 +405,27 @@
           "host:hassanova"
         ],
         "verified": true,
-        "note": "Trusted reaches Home Assistant"
+        "note": "Omada 'allow trusted > homeassistant'"
       },
       {
-        "id": "r13",
-        "rules": "13",
+        "id": "r15",
+        "rules": "15",
+        "action": "deny",
+        "from": [
+          "vlan:iot",
+          "vlan:trusted",
+          "vlan:leo",
+          "vlan:guest"
+        ],
+        "to": [
+          "vlan:servers"
+        ],
+        "verified": true,
+        "note": "Omada 'deny clients > servers'. No direct IP into Servers from client VLANs"
+      },
+      {
+        "id": "r16",
+        "rules": "16",
         "action": "deny",
         "from": [
           "vlan:servers",
@@ -314,23 +438,7 @@
           "vlan:mgmt"
         ],
         "verified": true,
-        "note": "Nothing reaches Management, except rules 4-6"
-      },
-      {
-        "id": "r14",
-        "rules": "14",
-        "action": "deny",
-        "from": [
-          "vlan:iot",
-          "vlan:trusted",
-          "vlan:leo",
-          "vlan:guest"
-        ],
-        "to": [
-          "vlan:servers"
-        ],
-        "verified": true,
-        "note": "No direct IP into Servers from client VLANs"
+        "note": "Omada 'deny servers,clients > mgmt'. Management to Management needs no deny; Management to Servers has none either"
       }
     ]
   },
