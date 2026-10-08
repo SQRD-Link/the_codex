@@ -7,6 +7,7 @@
     Omada    -> live gateway ACL vs policy.json drift      (optional, read-only)
     the_codex checkout -> services per host              (optional)
     Arcane   -> running compose projects per host        (optional, read-only key)
+    Pangolin -> published resources: auth and targets    (optional, read-only org key)
 
 It never touches policy.json. Anything NetBox disagrees with the policy about
 goes into inventory["drift"] and shows on the map as Errata. It does not get
@@ -19,6 +20,7 @@ Environment (see .env.example):
     PROXMOX_URL, PROXMOX_TOKEN_ID, PROXMOX_TOKEN_SECRET, PROXMOX_VERIFY_TLS=1
     OMADA_URL, OMADA_ID, OMADA_CLIENT_ID, OMADA_CLIENT_SECRET, OMADA_SITE, OMADA_VERIFY_TLS=1
     ARCANE_URL, ARCANE_API_KEY, ARCANE_VERIFY_TLS=1
+    PANGOLIN_URL, PANGOLIN_API_KEY, PANGOLIN_ORG (default sqrd)
 
 Usage:
     python3 tools/sync.py [--policy site/data/policy.json] [--out site/data/inventory.json]
@@ -398,7 +400,7 @@ def _arcane_pages(base: str, path: str, hdr: dict, verify: bool) -> list[dict]:
             return out
 
 
-def from_arcane(hosts: list[dict], norm: Norm, drift: list) -> bool:
+def from_arcane(hosts: list[dict], norm: Norm, drift: list, codex_listed: bool = False) -> bool:
     """Running Docker Compose projects per host. One Arcane environment per host, named after the host id
     (or an alias of it). Needs a key with environments:list (global) and containers:list only."""
     url, key = os.environ.get("ARCANE_URL"), os.environ.get("ARCANE_API_KEY")
@@ -425,12 +427,68 @@ def from_arcane(hosts: list[dict], norm: Norm, drift: list) -> bool:
             if c.get("state") != "running":
                 continue
             labels = c.get("labels") or {}
-            running.add(labels.get("com.docker.compose.project") or (c.get("names") or ["?"])[0].lstrip("/"))
-        for app in sorted(set(h.get("services", [])) - running):
+            name = labels.get("com.docker.compose.project") or (c.get("names") or ["?"])[0].lstrip("/")
+            running.add(name.removeprefix("ix-"))  # TrueNAS prefixes its apps with ix-
+        # only compare against the_codex when from_codex really filled services (otherwise they are seed text)
+        for app in sorted(set(h.get("services", [])) - running) if codex_listed else []:
+            if app.lower() in {r.lower() for r in running}:
+                continue
             drift.append({"severity": "info", "object": host_id, "message": f"{app} is in the_codex but not running according to Arcane."})
         h["services"] = sorted(running)
         covered.add(host_id)
     return bool(covered)
+
+
+def _is_ip(x: str) -> bool:
+    try:
+        ipaddress.ip_address(x)
+        return True
+    except ValueError:  # a hostname target
+        return False
+
+
+def from_pangolin(policy: dict, hosts: list[dict], drift: list) -> bool:
+    """Published resources (GET only): flag resources with no auth that policy.expect.no_pangolin_auth doesn't
+    allow, targets on a host's legacy IP, targets on an address no host owns, and enabled resources whose
+    targets are all disabled. The resource list already carries each resource's targets."""
+    url, key = os.environ.get("PANGOLIN_URL"), os.environ.get("PANGOLIN_API_KEY")
+    if not (url and key):
+        return False
+    org = os.environ.get("PANGOLIN_ORG", "sqrd")
+    hdr = {"Authorization": f"Bearer {key.strip()}"}
+    resources: list[dict] = []
+    page = 1
+    while True:
+        res = http_json(f"{url.rstrip('/')}/org/{org}/resources?page={page}&pageSize=100", hdr)["data"]
+        resources += res["resources"]
+        if not res["resources"] or len(resources) >= res["pagination"]["total"]:
+            break
+        page += 1
+
+    current, legacy = {}, {}
+    for h in hosts:
+        if h.get("ip"):
+            current[h["ip"]] = h["id"]
+        for ip in h.get("legacy_ips", []):
+            legacy[ip] = h["id"]
+    for d in policy.get("dns_servers", []):  # e.g. the secondary AdGuard has its own IP
+        current.setdefault(d["ip"], d["host"])
+    allowed = set(policy.get("expect", {}).get("no_pangolin_auth", []))
+
+    for r in resources:
+        name = r.get("name") or r.get("fullDomain") or str(r["resourceId"])
+        if r.get("enabled") and not any(r.get(k) for k in ("sso", "passwordId", "pincodeId", "whitelist", "headerAuthId")) and name not in allowed:
+            drift.append({"severity": "warn", "object": name, "message": "Published through Pangolin without any auth, and policy.expect.no_pangolin_auth doesn't list it."})
+        targets = r.get("targets") or []
+        if r.get("enabled") and targets and not any(t.get("enabled") for t in targets):
+            drift.append({"severity": "warn", "object": name, "message": "Pangolin resource is enabled but all its targets are disabled."})
+        for t in targets:
+            ip = t.get("ip")
+            if ip in legacy:
+                drift.append({"severity": "warn", "object": name, "message": f"Pangolin target {ip}:{t.get('port')} is {legacy[ip]}'s legacy address."})
+            elif ip and ip not in current and _is_ip(ip):
+                drift.append({"severity": "info", "object": name, "message": f"Pangolin target {ip}:{t.get('port')} is not a known host address."})
+    return True
 
 
 # ---------------------------------------------------------------- checks
@@ -485,7 +543,7 @@ def main() -> int:
         return 2
     norm = Norm(policy.get("aliases", {}))
     drift: list[dict] = []
-    sources = {"netbox": False, "proxmox": False, "omada": False, "omada_acl": False, "codex": False, "arcane": False}
+    sources = {"netbox": False, "proxmox": False, "omada": False, "omada_acl": False, "codex": False, "arcane": False, "pangolin": False}
 
     try:
         hosts, nb_vids = from_netbox(norm, drift)
@@ -504,9 +562,13 @@ def main() -> int:
     sources["omada_acl"] = bool(from_omada_acl(policy, hosts, drift))
     sources["codex"] = from_codex(hosts, pathlib.Path(a.codex) if a.codex else None)
     try:
-        sources["arcane"] = from_arcane(hosts, norm, drift)
+        sources["arcane"] = from_arcane(hosts, norm, drift, sources["codex"])
     except Exception as e:
         drift.append({"severity": "info", "object": "arcane", "message": f"Unavailable: {e}"})
+    try:
+        sources["pangolin"] = from_pangolin(policy, hosts, drift)
+    except Exception as e:
+        drift.append({"severity": "info", "object": "pangolin", "message": f"Unavailable: {e}"})
     check_policy(policy, hosts, nb_vids, drift, norm)
 
     clients = [
