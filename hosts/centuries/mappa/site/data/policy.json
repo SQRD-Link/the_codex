@@ -94,7 +94,8 @@
     "proxy": "pangolin",
     "local docker": "nastradamus",
     "minecraft-docker": "modcaves",
-    "centuries-docker": "centuries"
+    "centuries-docker": "centuries",
+    "adguardhome": "adguard-2"
   },
   "host_overrides": {
     "pangolin": {
@@ -183,7 +184,7 @@
     },
     {
       "label": "AdGuard 2 (secondary)",
-      "host": "nastradamus",
+      "host": "adguard-2",
       "ip": "10.10.100.2",
       "note": "Docker on nastradamus, synced via adguardhome-sync"
     }
@@ -206,10 +207,11 @@
           "vlan:guest"
         ],
         "to": [
-          "host:adguard"
+          "host:adguard",
+          "host:adguard-2"
         ],
         "verified": true,
-        "note": "Omada 'allow all-vlans > dns'. The group also holds the secondary resolver 10.10.100.2 (AdGuard on nastradamus), which has no host record, so sync still lists it as an ip: difference"
+        "note": "Omada 'allow all-vlans > dns'. Both resolvers: adguard (.100.1) and adguard-2 (.100.2, a Docker macvlan container on nastradamus)"
       },
       {
         "id": "r2",

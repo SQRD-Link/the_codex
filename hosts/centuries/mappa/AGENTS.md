@@ -17,6 +17,7 @@ Read all of this before editing anything.
 | Fact | Source of truth | File you touch |
 |---|---|---|
 | A host exists, its IP, role, tags, parent | NetBox | none. Fix NetBox, then run `tools/sync.py` |
+| A Docker container with its own LAN address (macvlan), e.g. adguard-2 | Arcane (found automatically, kind `container`, parent = its environment's host) | none. Rename it in `policy.aliases` (container name -> host id) |
 | LXC vs VM, running or stopped | Proxmox | none (sync pulls it) |
 | Client counts per VLAN | Omada | none (sync pulls it) |
 | Services on a host | Arcane (running compose projects), falling back to `the_codex/hosts/<host>/<app>/` | none. Map an Arcane environment name to its host in `policy.aliases` |
