@@ -238,7 +238,7 @@ function paper() {
 // ------------------------------------------------------------------ drawing: the city
 function rose() {
   const r = rng('rose');
-  let s = '<g id="rose" class="rough">';
+  let s = '<g id="rose" class="rough focus-target" data-focus="rose" tabindex="0" role="button" aria-label="Zoom to compass rose">';
   for (let a = 0; a < 360; a += 11.25) {
     const major = a % 45 === 0, p0 = P(R_PIAZZA + 4, a), p1 = P(major ? RIM1 + 70 : RIM0, a);
     s += `<path d="${M(jline(p0, p1, r, 1, 80))}" class="ink hair" opacity="${major ? .55 : .3}"/>`;
@@ -262,7 +262,7 @@ function rose() {
 
 function moat() {
   const r = rng('moat');
-  let s = `<g id="moat"><path d="${M(arcPts((MOAT0 + MOAT1) / 2, 0, 360))}" fill="none" stroke="var(--wash-blue)" stroke-width="${MOAT1 - MOAT0}" opacity=".55" filter="url(#wash)"/><g class="rough">`;
+  let s = `<g id="moat" class="focus-target" data-focus="moat" tabindex="0" role="button" aria-label="Zoom to moat"><path d="${M(arcPts((MOAT0 + MOAT1) / 2, 0, 360))}" fill="none" stroke="var(--wash-blue)" stroke-width="${MOAT1 - MOAT0}" opacity=".55" filter="url(#wash)"/><g class="rough">`;
   s += sk(M(arcPts(MOAT0, 0, 360, r, 1.5)), 'ink thin') + sk(M(arcPts(MOAT1, 0, 360, r, 1.5)), 'ink thin');
   for (let a = 0; a < 360; a += 3.2) {
     const rr = MOAT0 + 7 + r() * 16, p = P(rr, a), q = P(rr, a + 1.6);
@@ -287,7 +287,7 @@ function wardFields(m) {
 
 function streets(m) {
   const r = rng('streets');
-  let s = '<g id="streets" class="rough dimmable">';
+  let s = '<g id="streets" class="rough dimmable focus-target" data-focus="streets">';
   // ring road around the citadel
   s += sk(M(arcPts(R_PIAZZA, 0, 360, r, 1)), 'ink') + sk(M(arcPts(R_PIAZZA + 18, 0, 360, r, 1)), 'ink thin');
   for (const w of m.wards) {
@@ -304,7 +304,7 @@ function streets(m) {
 
 function walls(m) {
   const r = rng('walls');
-  let s = '<g id="walls" class="rough">';
+  let s = '<g id="walls" class="rough focus-target" data-focus="walls">';
   // city wall: hatched band
   const gate = m.wards.find(w => m.hosts.some(h => h.public && h.vlan === w.id));
   const gA = gate ? gate.gateA : null, gap = 4.2;
@@ -361,7 +361,7 @@ function citadel(m) {
     pts.push(P(66, a - 36), P(74, a - 17), P(116, a), P(74, a + 17));
   }
   const d = M(pts) + 'Z';
-  let s = `<g id="citadel" class="rough">`;
+  let s = `<g id="citadel" class="rough focus-target" data-focus="citadel" tabindex="0" role="button" aria-label="Zoom to citadel">`;
   s += `<path d="${M(arcPts(R_PIAZZA - 6, 0, 360))}Z" fill="var(--paper)" opacity=".6"/>`;
   s += `<path d="${d}" class="fill-paper"/><path d="${d}" fill="url(#hs45)"/>` + sk(d, 'ink bold');
   const inner = M(Array.from({ length: 5 }, (_, i) => P(44, i * 72 + 36))) + 'Z';
@@ -470,7 +470,7 @@ function buildings(m) {
 function world(m) {
   const r = rng('world');
   const G = [C.x - 40, 108], gr = 58;
-  let s = '<g id="world">';
+  let s = '<g id="world" class="focus-target" data-focus="world" tabindex="0" role="button" aria-label="Zoom to the world and network edge">';
   // the world: a sketched globe, meridians and parallels, the way Leonardo studied spheres
   s += `<g class="rough globe-hit" data-world="1"><circle cx="${G[0]}" cy="${G[1]}" r="${gr}" class="fill-paper"/>` + sk(circleD(G, gr, r, 1.5), 'ink bold');
   for (let i = 1; i < 4; i++) { const k = gr * Math.cos(rad(i * 22.5)); s += `<ellipse cx="${G[0]}" cy="${G[1]}" rx="${f(k)}" ry="${gr}" class="ink thin"/>`; }
@@ -505,7 +505,7 @@ function tunnel(m) {
   const entA = -52, E = P(RIM1 + 100, entA), T = P(h.r + 30, h.a);
   const c1 = P(RIM1 + 20, entA + 4), c2 = P(R - 30, h.a - 6);
   const d = `M${f(E[0])} ${f(E[1])} C${f(c1[0])} ${f(c1[1])} ${f(c2[0])} ${f(c2[1])} ${f(T[0])} ${f(T[1])}`;
-  let s = '<g id="tunnel" class="layer-tailscale">';
+  let s = '<g id="tunnel" class="layer-tailscale focus-target" data-focus="tunnel" tabindex="0" role="button" aria-label="Zoom to Tailscale route">';
   s += `<path d="${d}" class="ink" stroke="var(--paper)" stroke-width="9" opacity=".8"/><path d="${d}" class="ink sang" stroke-width="2.2" stroke-dasharray="10 6 2 6"/>`;
   s += `<g class="rough">${sk(circleD(E, 24, r), 'ink bold')}${sk(circleD(E, 13, r), 'ink thin')}<circle cx="${f(E[0])}" cy="${f(E[1])}" r="13" fill="url(#hx)"/></g>`;
   const routed = (ts.routes || []).map(id => m.wById[id]?.name).filter(Boolean).join(' + ');
@@ -519,7 +519,7 @@ function tunnel(m) {
 function title(m) {
   const t = m.policy.meta || {}, when = (m.inv.generated_at || '').slice(0, 10);
   const r = rng('title');
-  let s = '<g id="title">';
+  let s = '<g id="title" class="focus-target" data-focus="title" tabindex="0" role="button" aria-label="Zoom to map title and notes">';
   s += `<text x="70" y="128" font-size="86" class="t-it">${esc(t.title || 'Pianta della Rete')}</text>`;
   s += `<text x="74" y="172" font-size="26" class="t-it t-soft">${esc(t.subtitle || '')}</text>`;
   s += `<path d="${M(jline([72, 192], [640, 190], r, 2))}" class="ink thin"/>`;
@@ -542,7 +542,7 @@ function mechanism(m) {
   groups.push({ rules: '·', items: [], dflt: true });
   const x0 = 110, y0 = 590, dy = 70, gr = 30;
   const r = rng('mech');
-  let s = `<g id="mechanism"><text x="60" y="${y0 - 70}" font-size="28" class="t-it">Studio del meccanismo della porta</text>`;
+  let s = `<g id="mechanism" class="focus-target" data-focus="mechanism"><text x="60" y="${y0 - 70}" font-size="28" class="t-it">Studio del meccanismo della porta</text>`;
   s += `<text x="60" y="${y0 - 44}" font-size="17" class="t-it t-soft">the red packet falls past the rules in order; the first tooth that catches it decides</text>`;
   s += `<path d="${M(jline([x0 - 58, y0 - 22], [x0 - 58, y0 + dy * (groups.length - 1) + 20], r, 1.5))}" class="ink sang" stroke-dasharray="3 6"/>`;
   s += `<path d="M${x0 - 64} ${y0 + dy * (groups.length - 1) + 12} l6 12 l6 -12" class="ink sang"/>`;
@@ -569,7 +569,7 @@ function legend(m) {
   const x = 60, y = 1235;
   const row = (i, glyphSvg, t, sub) => `<g transform="translate(${x + 30} ${y + 36 + i * 44})">${glyphSvg}</g><text x="${x + 78}" y="${y + 42 + i * 44}" font-size="19">${t}</text><text x="${x + 78}" y="${y + 58 + i * 44}" font-size="14" class="t-it t-soft">${sub}</text>`;
   const sc = (g, k) => `<g transform="scale(${k})">${g}</g>`;
-  let s = `<g id="legend"><text x="${x}" y="${y}" font-size="28" class="t-it">Legenda</text>`;
+  let s = `<g id="legend" class="focus-target" data-focus="legend" tabindex="0" role="button" aria-label="Zoom to legend"><text x="${x}" y="${y}" font-size="28" class="t-it">Legenda</text>`;
   s += row(0, sc(glyph({ id: 'lg1', kind: 'hypervisor' }), .32), 'palazzo', 'hypervisor');
   s += row(1, sc(glyph({ id: 'lg2', kind: 'nas' }), .4), 'archivio', 'storage');
   s += row(2, sc(glyph({ id: 'lg3', kind: 'vm' }), .38), 'casa', 'virtual machine');
@@ -584,7 +584,7 @@ function legend(m) {
 
 function ledger(m) {
   const x = 1880; let y = 180;
-  let s = `<g id="ledger"><text x="${x}" y="${y}" font-size="28" class="t-it">Tabula nominum</text>`;
+  let s = `<g id="ledger" class="focus-target" data-focus="ledger" tabindex="0" role="button" aria-label="Zoom to DNS ledger and errata"><text x="${x}" y="${y}" font-size="28" class="t-it">Tabula nominum</text>`;
   s += `<text x="${x}" y="${y + 24}" font-size="16" class="t-it t-soft">where the names point</text>`;
   y += 64;
   for (const d of m.policy.dns || []) {
@@ -621,7 +621,7 @@ function study(m) {
   const r = rng('study-' + h.id);
   const cx = 1985, base = 1590, top = 1260, hw = 52, tw = 46;
   const L = y => cx - (hw - (hw - tw) * (base - y) / (base - top)), Rr = y => 2 * cx - L(y);
-  let s = `<g id="study" class="rough"><text x="1880" y="${top - 150}" font-size="26" class="t-it">Studio della torre</text>`;
+  let s = `<g id="study" class="rough focus-target" data-focus="study" tabindex="0" role="button" aria-label="Zoom to tower study"><text x="1880" y="${top - 150}" font-size="26" class="t-it">Studio della torre</text>`;
   s += `<text x="1880" y="${top - 126}" font-size="16" class="t-it t-soft">the watch that faces the world, in elevation</text>`;
   // body
   s += sk(M(jline([L(base), base], [L(top), top], r, 1.5)) + M(jline([Rr(top), top], [Rr(base), base], r, 1.5)).replace('M', ' M'), 'ink sang');
@@ -732,6 +732,11 @@ function clearSel() {
   document.getElementById('map').classList.remove('focus');
   const g = document.getElementById('flows'); if (g) g.innerHTML = '';
 }
+function focusSection(el) {
+  if (!el) return;
+  closeFolio();
+  zoomToElement(el, 1.3);
+}
 function rulesMentioning(m, toks) { return (m.policy.acl?.rules || []).filter(r => r.from.concat(r.to).some(t => toks.includes(t))); }
 function ruleLi(r) { return `<li><span class="pill ${r.action === 'permit' ? 'warn' : ''}">${esc(r.rules)} ${r.action}</span>${esc(r.note || '')}${r.verified === false ? ' <em>(unverified)</em>' : ''}</li>`; }
 
@@ -776,6 +781,7 @@ function selectHost(id) {
     <h3>Can reach (red roads)</h3><p>${ok.length ? ok.map(esc).join(' · ') : '<em>nothing beyond its ward</em>'}</p>
     ${rulesMentioning(m, toks).length ? `<h3>Rules that name it</h3><ul>${rulesMentioning(m, toks).map(ruleLi).join('')}</ul>` : ''}
     <div class="row"><button class="quill" data-dir="out">Where can it go</button><button class="quill" data-dir="in">Who reaches it</button></div>`);
+  zoomToElement(document.querySelector(`[data-host="${CSS.escape(id)}"]`), 1.8);
 }
 
 function selectWard(id) {
@@ -792,12 +798,17 @@ function selectWard(id) {
     <p><span class="pill">${deny} denied</span><span class="pill">${unk} undocumented</span></p>
     ${rulesMentioning(m, ['vlan:' + id]).length ? `<h3>Rules that name it</h3><ul>${rulesMentioning(m, ['vlan:' + id]).map(ruleLi).join('')}</ul>` : ''}
     <div class="row"><button class="quill" data-dir="out">Where can it go</button><button class="quill" data-dir="in">Who reaches it</button></div>`);
+  zoomToElement(document.querySelector(`.ward-hit[data-ward="${CSS.escape(id)}"]`), 1.2);
 }
 
 function selectRuleGroup(label) {
   const m = state.m; clearSel();
   document.querySelectorAll(`.gear[data-rules="${CSS.escape(label)}"]`).forEach(e => e.classList.add('sel'));
-  if (label === '·') { openFolio(`<h2>The default</h2><p class="art">when no rule catches</p><p>${esc(m.policy.acl?.default_note || '')}</p><p class="lede">${esc(m.policy.acl?.source || '')}</p>`); return; }
+  if (label === '·') {
+    zoomToElement(document.querySelector(`.gear[data-rules="${CSS.escape(label)}"]`), 1.5);
+    openFolio(`<h2>The default</h2><p class="art">when no rule catches</p><p>${esc(m.policy.acl?.default_note || '')}</p><p class="lede">${esc(m.policy.acl?.source || '')}</p>`);
+    return;
+  }
   const items = (m.policy.acl?.rules || []).filter(r => r.rules === label);
   const toEnt = t => t.startsWith('vlan:') ? { type: 'vlan', id: t.slice(5) } : { type: 'host', id: m.norm(t.slice(5)) };
   const pairs = [];
@@ -805,6 +816,8 @@ function selectRuleGroup(label) {
   if (!state.layers.acl) { state.layers.acl = true; applyLayers(); }
   document.getElementById('map').classList.add('focus');
   drawFlows(m, pairs);
+  const flows = document.getElementById('flows');
+  zoomToElement(flows.childElementCount ? flows : document.querySelector(`.gear[data-rules="${CSS.escape(label)}"]`), 1.25);
   openFolio(`<h2>Rule ${esc(label)}</h2><p class="art">${esc(items[0].action)}</p><ul>${items.map(r => `<li><code>${r.from.map(short).map(esc).join(', ')}</code> → <code>${r.to.map(short).map(esc).join(', ')}</code>${r.ports ? ` on <code>${r.ports.join(', ')}</code>` : ''}<br><em>${esc(r.note || '')}</em>${r.verified === false ? ' <span class="pill warn">unverified</span>' : ''}</li>`).join('')}</ul><p class="lede">${esc(m.policy.acl?.source || '')}</p>`);
 }
 
@@ -812,6 +825,7 @@ function selectWorld() {
   const m = state.m; clearSel();
   const pairs = m.pfHost ? [{ src: { type: 'world' }, dst: { type: 'host', id: m.pfHost }, res: { verdict: 'permit' } }] : [];
   document.getElementById('map').classList.add('focus'); drawFlows(m, pairs);
+  zoomToElement(document.querySelector('[data-world]'), 1.6);
   const pf = m.policy.edge?.port_forwards || [];
   openFolio(`<h2>Il Mondo</h2><p class="art">the internet</p><p class="lede">${esc(m.policy.edge?.internet?.note || '')}. No VPS, no tunnel: the ER605 forwards straight in.</p>
     <h3>Port-forwards</h3><ul>${pf.map(p => `<li><code>${esc(short(p.to))}</code>: ${esc(p.ports)}. ${esc(p.note || '')}</li>`).join('')}</ul>
@@ -843,16 +857,57 @@ function openAsk() {
 // ---- pan & zoom on the viewBox
 const vb = { x: 0, y: 0, w: W, h: H };
 function setVB() { document.getElementById('map').setAttribute('viewBox', `${f(vb.x)} ${f(vb.y)} ${f(vb.w)} ${f(vb.h)}`); }
+function viewBoxFor(box, padding = 1.3) {
+  if (!box || ![box.x, box.y, box.width, box.height].every(Number.isFinite) || box.width < 0 || box.height < 0 || (box.width === 0 && box.height === 0)) return null;
+  const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+  const w = Math.min(W * 1.2, Math.max(W / 8, Math.max(box.width, box.height * W / H) * padding));
+  const h = w * H / W;
+  return { x: cx - w / 2, y: cy - h / 2, w, h };
+}
+let flyFrame = 0;
+function cancelFlyTo() {
+  if (flyFrame) cancelAnimationFrame(flyFrame);
+  flyFrame = 0;
+}
+function flyToViewBox(target, duration = 900) {
+  if (!target) return;
+  cancelFlyTo();
+  const start = { ...vb };
+  const startX = start.x + start.w / 2, startY = start.y + start.h / 2;
+  const targetX = target.x + target.w / 2, targetY = target.y + target.h / 2;
+  let startedAt = null;
+  const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  const step = now => {
+    startedAt ??= now;
+    const t = Math.min(1, (now - startedAt) / Math.max(1, duration)), p = ease(t);
+    const w = start.w * Math.pow(target.w / start.w, p), h = w * H / W;
+    const x = startX + (targetX - startX) * p, y = startY + (targetY - startY) * p;
+    vb.x = x - w / 2; vb.y = y - h / 2; vb.w = w; vb.h = h;
+    setVB();
+    if (t < 1) flyFrame = requestAnimationFrame(step);
+    else flyFrame = 0;
+  };
+  flyFrame = requestAnimationFrame(step);
+}
+function zoomToElement(el, padding = 1.3, duration = 850) {
+  if (!el || typeof el.getBBox !== 'function') return;
+  flyToViewBox(viewBoxFor(el.getBBox(), padding), duration);
+}
 function toSvg(svg, cx, cy) { const r = svg.getBoundingClientRect(), s = Math.max(vb.w / r.width, vb.h / r.height), ox = (r.width - vb.w / s) / 2, oy = (r.height - vb.h / s) / 2; return [vb.x + (cx - r.left - ox) * s, vb.y + (cy - r.top - oy) * s, s]; }
-function zoomAt(svg, cx, cy, k) {
+function viewBoxAt(svg, cx, cy, k) {
   const [x, y] = toSvg(svg, cx, cy);
   const nw = Math.min(W * 1.2, Math.max(W / 8, vb.w * k)), kk = nw / vb.w;
-  vb.x = x - (x - vb.x) * kk; vb.y = y - (y - vb.y) * kk; vb.w = nw; vb.h = vb.h * kk; setVB();
+  const nh = vb.h * kk;
+  return { x: x - (x - vb.x) * kk, y: y - (y - vb.y) * kk, w: nw, h: nh };
+}
+function zoomAt(svg, cx, cy, k) {
+  Object.assign(vb, viewBoxAt(svg, cx, cy, k));
+  setVB();
 }
 function wirePanZoom(svg) {
-  svg.addEventListener('wheel', e => { e.preventDefault(); zoomAt(svg, e.clientX, e.clientY, Math.exp(e.deltaY * .0015)); }, { passive: false });
+  svg.addEventListener('wheel', e => { e.preventDefault(); cancelFlyTo(); zoomAt(svg, e.clientX, e.clientY, Math.exp(e.deltaY * .0015)); }, { passive: false });
   const pts = new Map(); let moved = false, last = null, pinch = null;
-  svg.addEventListener('pointerdown', e => { pts.set(e.pointerId, [e.clientX, e.clientY]); moved = false; last = [e.clientX, e.clientY]; if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); } });
+  svg.addEventListener('pointerdown', e => { cancelFlyTo(); pts.set(e.pointerId, [e.clientX, e.clientY]); moved = false; last = [e.clientX, e.clientY]; if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); } });
   svg.addEventListener('pointermove', e => {
     if (!pts.has(e.pointerId)) return;
     pts.set(e.pointerId, [e.clientX, e.clientY]);
@@ -867,11 +922,11 @@ function wirePanZoom(svg) {
   svg.addEventListener('pointerup', up); svg.addEventListener('pointercancel', up);
   svg.addEventListener('click', e => {
     if (moved) { e.stopPropagation(); moved = false; return; }
-    const b = e.target.closest('[data-host]'), w = e.target.closest('[data-ward]'), g = e.target.closest('.gear'), wo = e.target.closest('[data-world]');
-    if (b) selectHost(b.dataset.host); else if (g) selectRuleGroup(g.dataset.rules); else if (wo) selectWorld(); else if (w) selectWard(w.dataset.ward); else closeFolio();
+    const b = e.target.closest('[data-host]'), w = e.target.closest('[data-ward]'), g = e.target.closest('.gear'), wo = e.target.closest('[data-world]'), section = e.target.closest('[data-focus]');
+    if (b) selectHost(b.dataset.host); else if (g) selectRuleGroup(g.dataset.rules); else if (wo) selectWorld(); else if (w) selectWard(w.dataset.ward); else if (section) focusSection(section); else closeFolio();
   }, true);
-  svg.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { const b = e.target.closest('[data-host]'), g = e.target.closest('.gear'); if (b) { e.preventDefault(); selectHost(b.dataset.host); } else if (g) { e.preventDefault(); selectRuleGroup(g.dataset.rules); } } });
-  svg.addEventListener('dblclick', () => { Object.assign(vb, { x: 0, y: 0, w: W, h: H }); setVB(); });
+  svg.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { const b = e.target.closest('[data-host]'), g = e.target.closest('.gear'), section = e.target.closest('[data-focus]'); if (b) { e.preventDefault(); selectHost(b.dataset.host); } else if (g) { e.preventDefault(); selectRuleGroup(g.dataset.rules); } else if (section) { e.preventDefault(); focusSection(section); } } });
+  svg.addEventListener('dblclick', () => { cancelFlyTo(); Object.assign(vb, { x: 0, y: 0, w: W, h: H }); setVB(); });
 }
 
 async function main() {
@@ -887,7 +942,13 @@ async function main() {
   wirePanZoom(svg);
   document.querySelectorAll('.seal').forEach(b => b.addEventListener('click', () => { state.layers[b.dataset.layer] = !state.layers[b.dataset.layer]; applyLayers(); }));
   document.getElementById('btn-ask').addEventListener('click', openAsk);
-  document.getElementById('btn-reset').addEventListener('click', () => { closeFolio(); Object.assign(vb, { x: 0, y: 0, w: W, h: H }); setVB(); });
+  const zoomBy = factor => {
+    const r = svg.getBoundingClientRect();
+    flyToViewBox(viewBoxAt(svg, r.left + r.width / 2, r.top + r.height / 2, factor), 320);
+  };
+  document.getElementById('btn-zoom-in').addEventListener('click', () => zoomBy(1 / 1.4));
+  document.getElementById('btn-zoom-out').addEventListener('click', () => zoomBy(1.4));
+  document.getElementById('btn-reset').addEventListener('click', () => { cancelFlyTo(); closeFolio(); Object.assign(vb, { x: 0, y: 0, w: W, h: H }); setVB(); });
   document.getElementById('folio-close').addEventListener('click', closeFolio);
   document.getElementById('folio').addEventListener('click', e => {
     const a = e.target.closest('[data-goto]'); if (a) { e.preventDefault(); selectHost(a.dataset.goto); return; }
