@@ -19,7 +19,8 @@ Read all of this before editing anything.
 | A host exists, its IP, role, tags, parent | NetBox | none. Fix NetBox, then run `tools/sync.py` |
 | LXC vs VM, running or stopped | Proxmox | none (sync pulls it) |
 | Client counts per VLAN | Omada | none (sync pulls it) |
-| Services on a host | Arcane (running compose projects), falling back to `the_codex/hosts/<host>/<app>/` | none. Name each Arcane environment after its host id |
+| Services on a host | Arcane (running compose projects), falling back to `the_codex/hosts/<host>/<app>/` | none. Map an Arcane environment name to its host in `policy.aliases` |
+| Pangolin resources that are intentionally unauthenticated | here | `policy.json` → `expect.no_pangolin_auth` (resource names) |
 | VLANs, subnets, ward names, order | here | `site/data/policy.json` → `vlans` |
 | Gateway ACL rules | Omada (live, read-only via Open API) | `policy.json` → `acl.rules`. Sync only *compares* and reports drift in Errata; it never writes policy |
 | DNS records, rewrites | AdGuard / Cloudflare | `policy.json` → `dns` |

@@ -91,7 +91,10 @@
     "boven": "piano-nobile",
     "ap-boven": "piano-nobile",
     "prox": "grimoire",
-    "proxy": "pangolin"
+    "proxy": "pangolin",
+    "local docker": "nastradamus",
+    "minecraft-docker": "modcaves",
+    "centuries-docker": "centuries"
   },
   "host_overrides": {
     "pangolin": {
@@ -458,7 +461,11 @@
       "switch": "mgmt",
       "piano-terra": "mgmt",
       "piano-nobile": "mgmt"
-    }
+    },
+    "no_pangolin_auth": [
+      "hassanova",
+      "verzoekjes"
+    ]
   },
   "naming": {
     "theme": "Nostradamus for hosts and storage; Italian (Da Vinci era) for wards, the gateway and the access points.",

@@ -324,6 +324,13 @@
           "additionalProperties": {
             "$ref": "#/$defs/slug"
           }
+        },
+        "no_pangolin_auth": {
+          "type": "array",
+          "description": "Pangolin resource names that are intentionally published without any auth.",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
