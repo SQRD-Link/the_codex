@@ -5,3 +5,6 @@ srv/docker/secrets/
 
 # Environment files
 **/.env
+
+# Managed by the Ansible role "centuries" (SQRD-Link/semaphore), not by this repo
+hosts/centuries/observability/
