@@ -42,6 +42,32 @@ services:
       networks:
         - proxy
     # ================================
+    # LIDARR
+    # ================================
+    lidarr:
+        image: lscr.io/linuxserver/lidarr:latest
+        container_name: lidarr
+        restart: unless-stopped
+        environment:
+            - PUID=3001
+            - PGID=3001
+            - TZ=Europe/Amsterdam
+        volumes:
+            - /srv/docker/volumes/lidarr/config:/config
+            - /data/media/music:/music
+            - /data/media/downloads:/downloads
+        labels:
+            - "traefik.enable=true"
+            - "traefik.docker.network=proxy"
+            - "traefik.http.routers.lidarr.rule=Host(`lidarr.sqrd.link`)"
+            - "traefik.http.routers.lidarr.entrypoints=websecure"
+            - "traefik.http.routers.lidarr.tls=true"
+            - "traefik.http.routers.lidarr.tls.certresolver=cf"
+            - "traefik.http.services.lidarr.loadbalancer.server.port=8686"
+        networks:
+            - proxy
+
+    # ================================
     # SONARR
     # ================================
     sonarr:
@@ -164,7 +190,7 @@ services:
         init: true
         restart: unless-stopped
         environment:
-            - LOG_LEVEL=debug
+            - LOG_LEVEL=info
             - TZ=Europe/Amsterdam
             - PORT=5055
         volumes:
@@ -292,20 +318,6 @@ services:
             - "traefik.http.services.spotweb.loadbalancer.server.port=80"
         networks:
             - proxy
-    # ================================
-    # watchtower
-    # ================================
-
-    watchtower:
-        image: containrrr/watchtower
-        container_name: watchtower
-        volumes:
-          - /var/run/docker.sock:/var/run/docker.sock
-        environment:
-          - WATCHTOWER_CLEANUP=true
-          - WATCHTOWER_POLL_INTERVAL=86400 # Check every 24 hours (in seconds)
-        restart: unless-stopped
-
 networks:
     proxy:
         external: true
