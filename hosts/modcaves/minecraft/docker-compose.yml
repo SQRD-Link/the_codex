@@ -4,15 +4,15 @@
 # Captured from the running containers on 2026-10-17 (read via Arcane); nothing here changes
 # behaviour except the pins:
 #   - images are pinned by digest (they were :latest)
-#   - Minecraft versions are pinned (VERSION), see per server
+#   - Minecraft versions are pinned (VERSION), see per server (except mc-free4all, on purpose)
 # node-exporter and promtail on this host are managed by Ansible (observability_agent role).
 #
 # NOTE: mc-router starts a server on first connect and stops it after 5m idle, so the mc-*
 # containers are normally "Exited". `docker compose up -d` will start them all once; mc-router
 # stops them again after AUTO_SCALE_DOWN_AFTER. Prefer `up -d mc-router` unless you mean it.
 #
-# Not pinned yet (still float on every start): Fabric loader/launcher (itzg defaults to latest)
-# and the Modrinth mods of mc-oneblock (theoneblock, fabric-api).
+# Still floating on every start: Fabric loader/launcher (itzg defaults to latest) and the
+# Modrinth mods of mc-oneblock (theoneblock, fabric-api). mc-free4all floats by design.
 
 x-mc-server: &mc-server
   image: itzg/minecraft-server@sha256:59feb0a1ef286f20a20560c56adf5b927155bfa842951f5db8b8bbc5a1a3ebde  # :latest, image created 2026-09
@@ -115,8 +115,9 @@ services:
     environment:
       EULA: "TRUE"
       TYPE: FABRIC
-      # TODO pin: running with VERSION=latest, so the real version is whatever was current at the
-      # last start. Set it to the version the world was last played on (e.g. "1.21.x").
+      # Deliberately NOT pinned: this server follows the newest release so vanilla clients can
+      # always join. The image is still pinned by digest above; only the Minecraft (and Fabric)
+      # version floats, on every start.
       VERSION: latest
       MEMORY: 4G
       PUID: "1001"
