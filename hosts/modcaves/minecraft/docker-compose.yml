@@ -1,0 +1,134 @@
+# modcaves: Minecraft servers behind mc-router (scale to zero).
+#
+# Host path on modcaves: /root/minecraft/docker-compose.yml  (data in ./data/<server>)
+# Captured from the running containers on 2026-10-17 (read via Arcane); nothing here changes
+# behaviour except the pins:
+#   - images are pinned by digest (they were :latest)
+#   - Minecraft versions are pinned (VERSION), see per server
+# node-exporter and promtail on this host are managed by Ansible (observability_agent role).
+#
+# NOTE: mc-router starts a server on first connect and stops it after 5m idle, so the mc-*
+# containers are normally "Exited". `docker compose up -d` will start them all once; mc-router
+# stops them again after AUTO_SCALE_DOWN_AFTER. Prefer `up -d mc-router` unless you mean it.
+#
+# Not pinned yet (still float on every start): Fabric loader/launcher (itzg defaults to latest)
+# and the Modrinth mods of mc-oneblock (theoneblock, fabric-api).
+
+x-mc-server: &mc-server
+  image: itzg/minecraft-server@sha256:59feb0a1ef286f20a20560c56adf5b927155bfa842951f5db8b8bbc5a1a3ebde  # :latest, image created 2026-09
+  networks: [mc-net]
+
+services:
+  mc-router:
+    image: itzg/mc-router@sha256:e06735ea74877a7de649bcaec4cb917bf952564d32cbe258670fb7753192a1e9  # :latest
+    container_name: mc-router
+    restart: unless-stopped
+    environment:
+      IN_DOCKER: "true"
+      AUTO_SCALE_UP: "true"
+      AUTO_SCALE_DOWN: "true"
+      AUTO_SCALE_DOWN_AFTER: 5m
+      MAPPING: >-
+        free4all.sqrd.link=mc-free4all:25565,
+        survival.sqrd.link=mc-survival:25565,Survival.sqrd.link=mc-survival:25565,
+        creative.sqrd.link=mc-creative:25565,Creative.sqrd.link=mc-creative:25565,
+        oneblock.sqrd.link=mc-oneblock:25565,Oneblock.sqrd.link=mc-oneblock:25565
+    ports:
+      - "25565:25565"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks: [mc-net]
+
+  mc-survival:
+    <<: *mc-server
+    container_name: mc-survival
+    restart: unless-stopped
+    environment:
+      EULA: "TRUE"
+      TYPE: FABRIC
+      VERSION: "1.21.1"
+      MEMORY: 4G
+      PUID: "1001"
+      PGID: "1001"
+      ENFORCE_WHITELIST: "true"
+    labels:
+      arcane-sync.enable: "true"
+      mc-router.host: survival.sqrd.link
+      mc-router.port: "25565"
+    volumes:
+      - ./data/survival:/data
+
+  mc-creative:
+    <<: *mc-server
+    container_name: mc-creative
+    restart: unless-stopped
+    environment:
+      EULA: "TRUE"
+      TYPE: FABRIC
+      VERSION: "1.21.1"
+      MEMORY: 4G
+      PUID: "1001"
+      PGID: "1001"
+      ENFORCE_WHITELIST: "true"
+      DIFFICULTY: peaceful
+      GENERATE_STRUCTURES: "true"
+      CFG_DO_DAYLIGHT_CYCLE: "false"
+      CFG_DO_WEATHER_CYCLE: "false"
+      CREATE_CONSOLE_IN_PIPE: "true"
+      # Lowercase as found on the host. itzg reads SEED (uppercase), so this is probably ignored;
+      # left untouched because the world already exists.
+      seed: "7092830848548232924"
+    labels:
+      arcane-sync.enable: "true"
+      mc-router.host: creative.sqrd.link
+      mc-router.port: "25565"
+    volumes:
+      - ./data/creative:/data
+
+  mc-oneblock:
+    <<: *mc-server
+    container_name: mc-oneblock
+    restart: "no"          # as on the host (the other servers are unless-stopped)
+    environment:
+      EULA: "TRUE"
+      TYPE: FABRIC
+      VERSION: "1.21.11"
+      MEMORY: 4G
+      PUID: "1001"
+      PGID: "1001"
+      ENFORCE_WHITELIST: "true"
+      LEVEL_TYPE: "oneblock:oneblock"
+      SPAWN_PROTECTION: "0"
+      MODRINTH_PROJECTS: theoneblock,fabric-api   # unpinned: latest compatible on every start
+      MODRINTH_DOWNLOAD_DEPENDENCIES: required
+    labels:
+      arcane-sync.enable: "true"
+      mc-router.host: oneblock.sqrd.link
+      mc-router.port: "25565"
+    volumes:
+      - ./data/oneblock:/data
+
+  mc-free4all:
+    <<: *mc-server
+    container_name: mc-free4all
+    restart: unless-stopped
+    environment:
+      EULA: "TRUE"
+      TYPE: FABRIC
+      # TODO pin: running with VERSION=latest, so the real version is whatever was current at the
+      # last start. Set it to the version the world was last played on (e.g. "1.21.x").
+      VERSION: latest
+      MEMORY: 4G
+      PUID: "1001"
+      PGID: "1001"
+      ENFORCE_WHITELIST: "true"
+      USER_API_PROVIDER: mojang
+    labels:
+      arcane-sync.enable: "true"
+      mc-router.host: free4all.sqrd.link
+      mc-router.port: "25565"
+    volumes:
+      - ./data/free4all:/data
+
+networks:
+  mc-net: {}
