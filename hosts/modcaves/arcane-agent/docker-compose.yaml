@@ -1,0 +1,29 @@
+# modcaves: Arcane remote agent (edge/poll mode).
+#
+# Host path on modcaves: /srv/docker/compose/arcane-agent/docker-compose.yaml
+# Captured from the running container on 2026-10-17.
+#
+# Version policy: pin the agent to the SAME release as the Arcane server (TrueNAS app
+# `arcane`, currently v2.12.0). It was `:latest` and drifted to v2.11.0, which lacks the
+# container log download route the server uses. Bump server and agents together.
+#
+# AGENT_TOKEN comes from .env next to this file (gitignored); see .env.example.
+
+services:
+  arcane-agent:
+    image: ghcr.io/getarcaneapp/agent:v2.12.0
+    container_name: arcane-agent
+    restart: unless-stopped
+    environment:
+      - AGENT_MODE=true
+      - EDGE_TRANSPORT=poll
+      - AGENT_TOKEN=${AGENT_TOKEN:?set AGENT_TOKEN in .env}
+      - MANAGER_API_URL=http://localhost:3552
+    ports:
+      - "3553:3553"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - arcane-data:/app/data
+
+volumes:
+  arcane-data:
