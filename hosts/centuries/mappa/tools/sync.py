@@ -281,6 +281,35 @@ def from_omada(policy: dict, drift: list) -> dict[str, int] | None:
     return counts
 
 
+# The map draws one gear per distinct `rules` label, in a column that has room for nine
+# (the legend starts below that). One gear per Omada rule overflowed it at 22 rules.
+MAX_GEARS = 8  # leaves one row for the "default" gear
+
+
+def _group_gears(live: list[dict]) -> None:
+    """Give consecutive rules with the same action a shared `rules` label (e.g. "1-5"), so the map stays readable.
+
+    First-match order is kept: rules are only grouped with their neighbours, never across a permit/deny change.
+    The chunk size is the smallest that keeps the gear count within MAX_GEARS, so a short rule list stays one gear per rule.
+    """
+    runs: list[list[dict]] = []
+    for r in live:
+        if runs and runs[-1][0]["action"] == r["action"]:
+            runs[-1].append(r)
+        else:
+            runs.append([r])
+    k = 1
+    while sum(-(-len(run) // k) for run in runs) > MAX_GEARS and k < len(live):
+        k += 1
+    for run in runs:
+        for i in range(0, len(run), k):
+            chunk = run[i:i + k]
+            first, last = chunk[0]["rules"], chunk[-1]["rules"]
+            label = first if first == last else f"{first}-{last}"
+            for r in chunk:
+                r["rules"] = label
+
+
 def from_omada_acl(policy: dict, hosts: list[dict], drift: list) -> bool | None:
     """Read the live gateway ACL (Open API, GET only) and replace policy.acl.rules in memory with it.
 
@@ -373,6 +402,7 @@ def from_omada_acl(policy: dict, hosts: list[dict], drift: list) -> bool | None:
         drift.append({"severity": "info", "object": "omada:acl", "message": f"{skipped} gateway ACL rule(s) are not LAN-to-LAN and are not drawn."})
     for line in undrawn:
         drift.append({"severity": "warn", "object": "omada:acl", "message": f"Not drawn, refers to something that is not a known host or VLAN: {line}."})
+    _group_gears(live)
     # The map shows the live rules. policy.json keeps its own copy only as a fallback for when Omada is unreachable.
     acl = policy.setdefault("acl", {})
     acl["rules"] = live
