@@ -23,7 +23,7 @@ Read all of this before editing anything.
 | Services on a host | Arcane (running compose projects), falling back to `the_codex/hosts/<host>/<app>/` | none. Map an Arcane environment name to its host in `policy.aliases` |
 | Pangolin resources that are intentionally unauthenticated | here | `policy.json` → `expect.no_pangolin_auth` (resource names) |
 | VLANs, subnets, ward names, order | here | `site/data/policy.json` → `vlans` |
-| Gateway ACL rules | Omada (live, read-only via Open API) | none. `mappa-sync` writes the live rules into the *served* copy of `policy.json` on every run; the repo file is never edited. `policy.json` → `acl.rules` is only the fallback shown when Omada is unreachable. A rule that refers to something that is not a known host or VLAN is listed in Errata and not drawn |
+| Gateway ACL rules | Omada (live, read-only via Open API) | none. `mappa-sync` writes the live rules into the *served* copy of `policy.json` on every run; the repo file is never edited. `policy.json` → `acl.rules` is only the fallback shown when Omada is unreachable. A rule that refers to something that is not a known host or VLAN is listed in Errata and not drawn. The gear column has room for nine gears, so consecutive rules with the same action are grouped under a shared label ("1-4"); click a gear to see every rule in it |
 | DNS records, rewrites | AdGuard / Cloudflare | `policy.json` → `dns` |
 | Port-forwards, Tailscale routes | ER605 / Tailscale admin | `policy.json` → `edge`, `tailscale` |
 | NetBox name differs from real name | here | `policy.json` → `aliases` |
