@@ -16,14 +16,14 @@ Read all of this before editing anything.
 
 | Fact | Source of truth | File you touch |
 |---|---|---|
-| A host exists, its IP, role, tags, parent | NetBox | none. Fix NetBox, then run `tools/sync.py` |
+| A host exists, its IP, role, tags, parent | NetBox | none. Fix NetBox, then run `tools/sync.py`. If NetBox has no IP for a Proxmox guest, sync takes the static IP from the guest's Proxmox config (and says so as info). Proxmox templates are ignored |
 | A Docker container with its own LAN address (macvlan), e.g. adguard-2 | Arcane (found automatically, kind `container`, parent = its environment's host) | none. Rename it in `policy.aliases` (container name -> host id) |
 | LXC vs VM, running or stopped | Proxmox | none (sync pulls it) |
 | Client counts per VLAN | Omada | none (sync pulls it) |
 | Services on a host | Arcane (running compose projects), falling back to `the_codex/hosts/<host>/<app>/` | none. Map an Arcane environment name to its host in `policy.aliases` |
 | Pangolin resources that are intentionally unauthenticated | here | `policy.json` → `expect.no_pangolin_auth` (resource names) |
 | VLANs, subnets, ward names, order | here | `site/data/policy.json` → `vlans` |
-| Gateway ACL rules | Omada (live, read-only via Open API) | `policy.json` → `acl.rules`. Sync only *compares* and reports drift in Errata; it never writes policy |
+| Gateway ACL rules | Omada (live, read-only via Open API) | none. `mappa-sync` writes the live rules into the *served* copy of `policy.json` on every run; the repo file is never edited. `policy.json` → `acl.rules` is only the fallback shown when Omada is unreachable. A rule that refers to something that is not a known host or VLAN is listed in Errata and not drawn |
 | DNS records, rewrites | AdGuard / Cloudflare | `policy.json` → `dns` |
 | Port-forwards, Tailscale routes | ER605 / Tailscale admin | `policy.json` → `edge`, `tailscale` |
 | NetBox name differs from real name | here | `policy.json` → `aliases` |
@@ -44,8 +44,8 @@ Read all of this before editing anything.
 
 ### An ACL rule changed on the ER605
 
-0. If `tools/sync.py` has Omada credentials, it lists differences between Omada and `policy.acl.rules` as Errata ("Omada has a rule policy.json lacks", "Ports differ", ...). Fix `policy.json` to match Omada, or fix Omada if the policy is the intent. It compares who reaches whom on which ports. It does not compare rule order or protocol.
-1. Edit `policy.acl.rules`. **Order is evaluation order** (first match wins), so keep it identical to Omada.
+0. Nothing to edit: the map shows the live Omada rules (in Omada's order, named after the rule description). If a rule is missing from the map, look for "Not drawn" in Errata. That means the rule names an IP that is not a known host: fix the host (NetBox or Proxmox guest config).
+1. Only if you want to refresh the fallback copy: edit `policy.acl.rules`. **Order is evaluation order** (first match wins).
 2. `rules` is the Omada rule number label. Rows that share a label are drawn as one gear.
 3. Set `verified: false` unless the change was confirmed in the Omada UI or with a curl test.
 4. Use only `vlan:<id>` and `host:<id>` references. `validate.py` rejects anything that doesn't resolve.

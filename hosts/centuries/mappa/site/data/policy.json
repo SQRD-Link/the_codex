@@ -4,7 +4,7 @@
     "title": "Pianta della Rete",
     "subtitle": "The SQRD network, drawn as a fortified city",
     "author": "per mano dell'ingegnere di casa",
-    "updated": "2026-10-08",
+    "updated": "2026-10-26",
     "notes": [
       "Every road between wards passes through the citadel. There is no other way across.",
       "The long thread (Tailscale) comes in under the walls, but the gate still judges it."
@@ -25,7 +25,7 @@
       "art": "Officina",
       "subnet": "10.10.100.0/24",
       "purpose": "LXC, VM and Docker homelab",
-      "tailscale": true,
+      "tailscale": false,
       "order": 0
     },
     {
@@ -57,7 +57,7 @@
       "art": "Governo",
       "subnet": "10.10.10.0/24",
       "purpose": "Proxmox, TrueNAS, PBS, switch, APs",
-      "tailscale": true,
+      "tailscale": false,
       "order": 3
     },
     {
@@ -106,10 +106,6 @@
       "lean": "iot",
       "note": "IP sits in Servers (.100.55), but it tends the IoT ward through a postern gate (rules 7-8)."
     },
-    "teelskeel": {
-      "lean": "guest",
-      "note": "Native tailscaled on Ubuntu LXC, not Docker. Subnet router and exit node."
-    },
     "grimoire": {
       "note": "Still dual-homed on 10.10.100.8 (legacy interface, not yet retired)."
     },
@@ -134,15 +130,6 @@
         "note": "Router port-forward straight to Pangolin"
       }
     ]
-  },
-  "tailscale": {
-    "host": "teelskeel",
-    "routes": [
-      "servers",
-      "mgmt"
-    ],
-    "exit_node": true,
-    "note": "IoT, Trusted, Leo and Guest are deliberately not routed."
   },
   "dns": [
     {
@@ -270,8 +257,7 @@
         "rules": "5",
         "action": "permit",
         "from": [
-          "host:centuries",
-          "host:teelskeel"
+          "host:centuries"
         ],
         "to": [
           "host:grimoire"
@@ -287,8 +273,7 @@
         "rules": "6",
         "action": "permit",
         "from": [
-          "host:centuries",
-          "host:teelskeel"
+          "host:centuries"
         ],
         "to": [
           "host:nastradamus"

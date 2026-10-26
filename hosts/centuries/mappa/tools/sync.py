@@ -2,16 +2,18 @@
 """Build site/data/inventory.json from the live sources of truth.
 
     NetBox   -> hosts, IPs, roles, tags, parents        (required)
-    Proxmox  -> lxc vs vm, running/stopped, node         (optional)
+    Proxmox  -> lxc vs vm, running/stopped, node, guest IP if NetBox has none (optional)
     Omada    -> client counts per VLAN                   (optional)
-    Omada    -> live gateway ACL vs policy.json drift      (optional, read-only)
+    Omada    -> the live gateway ACL shown on the map     (optional, read-only)
     the_codex checkout -> services per host              (optional)
     Arcane   -> running compose projects per host        (optional, read-only key)
     Pangolin -> published resources: auth and targets    (optional, read-only org key)
 
-It never touches policy.json. Anything NetBox disagrees with the policy about
-goes into inventory["drift"] and shows on the map as Errata. It does not get
-silently "fixed".
+It never edits the repo's policy.json. Anything NetBox disagrees with the policy
+about goes into inventory["drift"] and shows on the map as Errata. It does not
+get silently "fixed". Two things are read live instead of kept by hand: a guest
+IP that NetBox lacks (from the Proxmox guest config) and the gateway ACL (from
+Omada, published to the served copy of the policy with --publish-policy).
 
 Standard library only, so it runs in a bare python:3.12-alpine container.
 
@@ -35,6 +37,7 @@ import ipaddress
 import json
 import os
 import pathlib
+import re
 import ssl
 import sys
 import urllib.parse
@@ -176,16 +179,33 @@ def from_netbox(norm: Norm, drift: list) -> tuple[list[dict], set[int]]:
     return hosts, {v["vid"] for v in vlans}
 
 
+def _guest_ip(url: str, hdr: dict, verify: bool, r: dict) -> str | None:
+    """First static IPv4 in a guest's Proxmox config: LXC `net<N>: ...,ip=A.B.C.D/NN`, VM (cloud-init) `ipconfig<N>: ip=A.B.C.D/NN,gw=...`.
+
+    Declarative, so it is correct for a guest whose IP tag or NetBox record is missing. DHCP guests have no `ip=` address and return None.
+    """
+    kind = "lxc" if r["type"] == "lxc" else "qemu"
+    cfg = http_json(f"{url.rstrip('/')}/api2/json/nodes/{r['node']}/{kind}/{r['vmid']}/config", hdr, verify=verify)["data"]
+    key_re = re.compile(r"^(net|ipconfig)\d+$")
+    for key in sorted(k for k in cfg if key_re.match(k)):
+        m = re.search(r"(?:^|,)ip=(\d{1,3}(?:\.\d{1,3}){3})/", str(cfg[key]))
+        if m:
+            return m.group(1)
+    return None
+
+
 def from_proxmox(hosts: list[dict], norm: Norm, drift: list, expect_missing: set[str]) -> bool:
     url, tid, sec = (os.environ.get(k) for k in ("PROXMOX_URL", "PROXMOX_TOKEN_ID", "PROXMOX_TOKEN_SECRET"))
     if not (url and tid and sec):
         return False
-    res = http_json(
-        f"{url.rstrip('/')}/api2/json/cluster/resources?type=vm",
-        {"Authorization": f"PVEAPIToken={tid}={sec}"},
-        verify=env_bool("PROXMOX_VERIFY_TLS"),
-    )["data"]
+    hdr, verify = {"Authorization": f"PVEAPIToken={tid}={sec}"}, env_bool("PROXMOX_VERIFY_TLS")
+    res = http_json(f"{url.rstrip('/')}/api2/json/cluster/resources?type=vm", hdr, verify=verify)["data"]
     by = {norm(r["name"]): r for r in res if not r.get("template")}
+    # Proxmox marks templates itself; they are images, not hosts, so they are never drawn or reported.
+    templates = {norm(r["name"]) for r in res if r.get("template")}
+    if templates:
+        hosts[:] = [h for h in hosts if h["id"] not in templates]
+        drift[:] = [d for d in drift if d["object"] not in templates]
     seen = set()
     for h in hosts:
         r = by.get(h["id"])
@@ -198,6 +218,16 @@ def from_proxmox(hosts: list[dict], norm: Norm, drift: list, expect_missing: set
         h["status"] = r.get("status", h.get("status"))
         h.setdefault("parent", norm(r["node"]))
         h["vmid"] = r.get("vmid")
+        if not h.get("ip"):
+            try:
+                ip = _guest_ip(url, hdr, verify, r)
+            except Exception as e:  # enrichment only
+                ip = None
+                drift.append({"severity": "info", "object": h["id"], "message": f"Could not read the Proxmox guest config: {e}"})
+            if ip:
+                h["ip"] = ip
+                drift[:] = [d for d in drift if not (d["object"] == h["id"] and d["message"] == "No IP address in NetBox at all.")]
+                drift.append({"severity": "info", "object": h["id"], "message": f"NetBox has no IP; using {ip} from the Proxmox guest config."})
     for name in sorted(set(by) - seen):
         drift.append({"severity": "warn", "object": name, "message": f"Guest {by[name]['vmid']} runs in Proxmox but is not in NetBox."})
     return True
@@ -251,54 +281,11 @@ def from_omada(policy: dict, drift: list) -> dict[str, int] | None:
     return counts
 
 
-def _expand(rules: list[dict]) -> dict[tuple, frozenset | None]:
-    """Rules as {(action, src, dst): ports}. ports None means any port; refs are vlan:<id> / host:<id> / ip:<addr>."""
-    atoms: dict[tuple, set | None] = {}
-    for r in rules:
-        for src in r["from"]:
-            for dst in r["to"]:
-                key = (r["action"], src, dst)
-                ports = None if r.get("ports") is None else {str(x) for x in r["ports"]}
-                if key not in atoms:
-                    atoms[key] = ports
-                elif atoms[key] is None or ports is None:
-                    atoms[key] = None
-                else:
-                    atoms[key] |= ports
-    return {k: (None if v is None else frozenset(v)) for k, v in atoms.items()}
-
-
-def _fmt_ports(p) -> str:
-    return "any port" if p is None else "port " + ",".join(sorted(p, key=lambda x: (len(x), x)))
-
-
-def _acl_diff(policy_rules: list[dict], live_rules: list[dict]) -> list[str]:
-    """Compare by who-reaches-whom-on-which-ports. First-match order and protocol are NOT compared."""
-    pol, live = _expand(policy_rules), _expand(live_rules)
-    out: list[str] = []
-
-    def grouped(missing: dict, where: str) -> None:
-        by_ports: dict[tuple, dict[str, set]] = {}
-        for (act, src, dst), ports in missing.items():
-            by_ports.setdefault((act, ports), {}).setdefault(src, set()).add(dst)
-        for (act, ports), by_src in sorted(by_ports.items(), key=lambda kv: (kv[0][0], str(kv[0][1]))):
-            inv: dict[frozenset, list] = {}
-            for src, dsts in by_src.items():
-                inv.setdefault(frozenset(dsts), []).append(src)
-            for dsts, srcs in inv.items():
-                out.append(f"{where}: {act} {', '.join(sorted(srcs))} -> {', '.join(sorted(dsts))} ({_fmt_ports(ports)})")
-
-    grouped({k: v for k, v in live.items() if k not in pol}, "Omada has a rule policy.json lacks")
-    grouped({k: v for k, v in pol.items() if k not in live}, "policy.json has a rule Omada lacks")
-    for key in sorted(set(pol) & set(live)):
-        if pol[key] != live[key]:
-            act, src, dst = key
-            out.append(f"Ports differ for {act} {src} -> {dst}: policy.json says {_fmt_ports(pol[key])}, Omada says {_fmt_ports(live[key])}")
-    return out
-
-
 def from_omada_acl(policy: dict, hosts: list[dict], drift: list) -> bool | None:
-    """Read the live gateway ACL (Open API, GET only) and report where it disagrees with policy.acl.rules."""
+    """Read the live gateway ACL (Open API, GET only) and replace policy.acl.rules in memory with it.
+
+    The caller publishes the result (see --publish-policy); the repo's policy.json is never edited.
+    """
     try:
         sess = _omada_login()
         if sess is None:
@@ -354,21 +341,43 @@ def from_omada_acl(policy: dict, hosts: list[dict], drift: list) -> bool | None:
         return refs, ports
 
     live: list[dict] = []
-    skipped = 0
+    skipped, undrawn = 0, []
     for r in acls:
         d = r.get("direction") or {}
         if not r.get("status"):
             continue
         if not d.get("lanToLan") or d.get("lanToWan") or d.get("wanInIds") or d.get("vpnInIds"):
-            skipped += 1  # policy.json only models LAN-to-LAN
+            skipped += 1  # the map only models LAN-to-LAN
             continue
         src, _ = resolve(r["sourceType"], r["sourceIds"])
         dst, ports = resolve(r["destinationType"], r["destinationIds"])
-        live.append({"action": "permit" if r["policy"] else "deny", "from": src, "to": dst, "ports": sorted(ports) if ports else None})
+        src, dst = list(dict.fromkeys(src)), list(dict.fromkeys(dst))  # two groups can list the same host
+        bad = [t for t in src + dst if not t.startswith(("vlan:", "host:"))]
+        if bad or (ports and not all(str(x).isdigit() for x in ports)):
+            undrawn.append(f"rule {r['index']} ({r.get('description') or 'unnamed'}): " + (", ".join(bad) if bad else "port ranges"))
+            continue
+        row = {
+            "id": f"omada-{r['index']}",
+            "rules": str(r["index"]),
+            "action": "permit" if r["policy"] else "deny",
+            "from": src,
+            "to": dst,
+            "verified": True,
+        }
+        if ports:
+            row["ports"] = sorted(int(x) for x in ports)
+        if r.get("description"):
+            row["note"] = r["description"]
+        live.append(row)
     if skipped:
-        drift.append({"severity": "info", "object": "omada:acl", "message": f"{skipped} gateway ACL rule(s) are not LAN-to-LAN and were not compared."})
-    for line in _acl_diff(policy.get("acl", {}).get("rules", []), live):
-        drift.append({"severity": "warn", "object": "omada:acl", "message": line})
+        drift.append({"severity": "info", "object": "omada:acl", "message": f"{skipped} gateway ACL rule(s) are not LAN-to-LAN and are not drawn."})
+    for line in undrawn:
+        drift.append({"severity": "warn", "object": "omada:acl", "message": f"Not drawn, refers to something that is not a known host or VLAN: {line}."})
+    # The map shows the live rules. policy.json keeps its own copy only as a fallback for when Omada is unreachable.
+    acl = policy.setdefault("acl", {})
+    acl["rules"] = live
+    acl["source"] = "Live from the Omada Open API (read-only), rebuilt by mappa-sync on every run."
+    acl["default"] = acl.get("default", "unknown")
     return True
 
 
@@ -553,6 +562,7 @@ def main() -> int:
     ap.add_argument("--policy", default=str(ROOT / "site/data/policy.json"))
     ap.add_argument("--out", default=str(ROOT / "site/data/inventory.json"))
     ap.add_argument("--codex", default=os.environ.get("CODEX_PATH"))
+    ap.add_argument("--publish-policy", help="write the effective policy (live ACL rules applied) here; point it at the served copy, never at the repo file")
     ap.add_argument("--dry-run", action="store_true", help="print, don't write")
     a = ap.parse_args()
 
@@ -612,6 +622,11 @@ def main() -> int:
     if a.dry_run:
         print(text)
         return 0
+    if a.publish_policy and sources["omada_acl"]:
+        pub = pathlib.Path(a.publish_policy)
+        ptmp = pub.with_suffix(".tmp")
+        ptmp.write_text(json.dumps(policy, indent=2, ensure_ascii=False) + "\n")
+        ptmp.replace(pub)
     # only rewrite when something other than the timestamp changed, so git history stays meaningful
     if out.exists():
         try:

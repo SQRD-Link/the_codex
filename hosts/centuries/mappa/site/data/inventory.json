@@ -114,18 +114,6 @@
       ]
     },
     {
-      "id": "teelskeel",
-      "ip": "10.10.100.13",
-      "kind": "lxc",
-      "role": "Tailscale subnet router",
-      "parent": "grimoire",
-      "status": "running",
-      "tags": [],
-      "services": [
-        "tailscaled"
-      ]
-    },
-    {
       "id": "plex",
       "ip": "10.10.100.15",
       "kind": "lxc",
