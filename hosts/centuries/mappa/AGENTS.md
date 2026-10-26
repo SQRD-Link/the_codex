@@ -25,7 +25,8 @@ Read all of this before editing anything.
 | VLANs, subnets, ward names, order | here | `site/data/policy.json` → `vlans` |
 | Gateway ACL rules | Omada (live, read-only via Open API) | none. `mappa-sync` writes the live rules into the *served* copy of `policy.json` on every run; the repo file is never edited. `policy.json` → `acl.rules` is only the fallback shown when Omada is unreachable. A rule that refers to something that is not a known host or VLAN is listed in Errata and not drawn. The gear column has room for nine gears, so consecutive rules with the same action are grouped under a shared label ("1-4"); click a gear to see every rule in it |
 | DNS records, rewrites | AdGuard / Cloudflare | `policy.json` → `dns` |
-| Port-forwards, Tailscale routes | ER605 / Tailscale admin | `policy.json` → `edge`, `tailscale` |
+| Port-forwards | ER605 | `policy.json` → `edge` |
+| A remote-access tunnel (Tailscale was retired 2026-10-11; the Tailscale layer, legend row and button only appear while `policy.json` has a `tailscale` block) | its admin console | `policy.json` → `tailscale` |
 | NetBox name differs from real name | here | `policy.json` → `aliases` |
 | What NetBox *should* say | here | `policy.json` → `expect` |
 
