@@ -8,12 +8,13 @@
     the_codex checkout -> services per host              (optional)
     Arcane   -> running compose projects per host        (optional, read-only key)
     Pangolin -> published resources: auth and targets    (optional, read-only org key)
+    AdGuard  -> the DNS rewrites shown in the ledger     (optional, GET only; the login itself is admin)
 
 It never edits the repo's policy.json. Anything NetBox disagrees with the policy
 about goes into inventory["drift"] and shows on the map as Errata. It does not
 get silently "fixed". Two things are read live instead of kept by hand: a guest
 IP that NetBox lacks (from the Proxmox guest config) and the gateway ACL (from
-Omada, published to the served copy of the policy with --publish-policy).
+Omada) and the DNS rewrites (from AdGuard), both published to the served copy of the policy with --publish-policy.
 
 Standard library only, so it runs in a bare python:3.12-alpine container.
 
@@ -23,6 +24,7 @@ Environment (see .env.example):
     OMADA_URL, OMADA_ID, OMADA_CLIENT_ID, OMADA_CLIENT_SECRET, OMADA_SITE, OMADA_VERIFY_TLS=1
     ARCANE_URL, ARCANE_API_KEY, ARCANE_VERIFY_TLS=1
     PANGOLIN_URL, PANGOLIN_API_KEY, PANGOLIN_ORG (default sqrd)
+    ADGUARD_URL, ADGUARD_USER, ADGUARD_PASSWORD, ADGUARD_VERIFY_TLS=1
 
 Usage:
     python3 tools/sync.py [--policy site/data/policy.json] [--out site/data/inventory.json]
@@ -32,6 +34,7 @@ Exit codes: 0 written or unchanged, 1 NetBox unreachable, 2 bad policy.
 from __future__ import annotations
 
 import argparse
+import base64
 import datetime as dt
 import ipaddress
 import json
@@ -411,6 +414,52 @@ def from_omada_acl(policy: dict, hosts: list[dict], drift: list) -> bool | None:
     return True
 
 
+def from_adguard(policy: dict, hosts: list[dict], drift: list) -> bool | None:
+    """Read the DNS rewrites from AdGuard Home (GET /control/rewrite/list) and make them the DNS ledger.
+
+    Replaces policy["dns"] in memory with the live rewrites, in AdGuard's order. A rewrite keeps the note of a
+    hand-written entry for the same record as long as it still points at the same place. Entries marked
+    `"manual": true` (records AdGuard does not hold, e.g. Cloudflare's) are appended unchanged.
+    AdGuard has one role (admin), so the login can write even though this only ever GETs.
+    """
+    url, user, pw = (os.environ.get(k) for k in ("ADGUARD_URL", "ADGUARD_USER", "ADGUARD_PASSWORD"))
+    if not (url and user and pw):
+        return None
+    try:
+        auth = base64.b64encode(f"{user}:{pw}".encode()).decode()
+        rewrites = http_json(f"{url.rstrip('/')}/control/rewrite/list", {"Authorization": f"Basic {auth}"}, verify=env_bool("ADGUARD_VERIFY_TLS"))
+    except Exception as e:  # enrichment only; the hand-kept ledger stays as the fallback
+        drift.append({"severity": "info", "object": "adguard", "message": f"DNS rewrites unavailable: {e}"})
+        return None
+    host_by_ip = {ip: h["id"] for h in hosts for ip in [h.get("ip"), *h.get("legacy_ips", [])] if ip}
+    static = {d["record"]: d for d in policy.get("dns", [])}
+    has_internet = "internet" in (policy.get("edge") or {})
+    ledger: list[dict] = []
+    for rw in rewrites:
+        rec, ans = rw.get("domain"), rw.get("answer", "")
+        if not rec or rw.get("enabled") is False:
+            continue
+        try:
+            ip = ipaddress.ip_address(ans)
+        except ValueError:
+            ip = None  # a hostname (CNAME-style rewrite), so outside the lab
+        if ip is not None and ans in host_by_ip:
+            target = "host:" + host_by_ip[ans]
+        elif (ip is None or not ip.is_private) and has_internet:
+            target = "edge:internet"
+        else:
+            drift.append({"severity": "warn", "object": "adguard", "message": f"Rewrite {rec} -> {ans} points at an address that is not a known host. Not drawn."})
+            continue
+        entry = {"record": rec, "target": target, "value": ans}
+        old = static.get(rec)
+        if old and old.get("target") == target and old.get("note"):
+            entry["note"] = old["note"]
+        ledger.append(entry)
+    ledger += [d for d in policy.get("dns", []) if d.get("manual")]
+    policy["dns"] = ledger
+    return True
+
+
 def from_codex(hosts: list[dict], codex: pathlib.Path | None) -> bool:
     """hosts/<host>/<app>/docker-compose.yml in the_codex -> services on that host."""
     if not codex or not (codex / "hosts").is_dir():
@@ -603,7 +652,7 @@ def main() -> int:
         return 2
     norm = Norm(policy.get("aliases", {}))
     drift: list[dict] = []
-    sources = {"netbox": False, "proxmox": False, "omada": False, "omada_acl": False, "codex": False, "arcane": False, "pangolin": False}
+    sources = {"netbox": False, "proxmox": False, "omada": False, "omada_acl": False, "codex": False, "arcane": False, "pangolin": False, "adguard": False}
 
     try:
         hosts, nb_vids = from_netbox(norm, drift)
@@ -629,6 +678,10 @@ def main() -> int:
         sources["pangolin"] = from_pangolin(policy, hosts, drift)
     except Exception as e:
         drift.append({"severity": "info", "object": "pangolin", "message": f"Unavailable: {e}"})
+    try:
+        sources["adguard"] = bool(from_adguard(policy, hosts, drift))
+    except Exception as e:
+        drift.append({"severity": "info", "object": "adguard", "message": f"Unavailable: {e}"})
     check_policy(policy, hosts, nb_vids, drift, norm)
 
     clients = [
@@ -652,7 +705,7 @@ def main() -> int:
     if a.dry_run:
         print(text)
         return 0
-    if a.publish_policy and sources["omada_acl"]:
+    if a.publish_policy and (sources["omada_acl"] or sources["adguard"]):
         pub = pathlib.Path(a.publish_policy)
         ptmp = pub.with_suffix(".tmp")
         ptmp.write_text(json.dumps(policy, indent=2, ensure_ascii=False) + "\n")

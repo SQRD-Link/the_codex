@@ -24,7 +24,8 @@ Read all of this before editing anything.
 | Pangolin resources that are intentionally unauthenticated | here | `policy.json` → `expect.no_pangolin_auth` (resource names) |
 | VLANs, subnets, ward names, order | here | `site/data/policy.json` → `vlans` |
 | Gateway ACL rules | Omada (live, read-only via Open API) | none. `mappa-sync` writes the live rules into the *served* copy of `policy.json` on every run; the repo file is never edited. `policy.json` → `acl.rules` is only the fallback shown when Omada is unreachable. A rule that refers to something that is not a known host or VLAN is listed in Errata and not drawn. The gear column has room for nine gears, so consecutive rules with the same action are grouped under a shared label ("1-4"); click a gear to see every rule in it |
-| DNS records, rewrites | AdGuard / Cloudflare | `policy.json` → `dns` |
+| DNS rewrites | AdGuard (live). Needs `ADGUARD_*` in `.env`; `mappa-sync` writes them into the *served* policy | none. `policy.json` → `dns` is the fallback and the place for notes: an entry for the same record keeps its note while it points at the same place |
+| DNS records AdGuard does not hold (Cloudflare, the Omada name) | here | `policy.json` → `dns`, with `"manual": true` |
 | Port-forwards | ER605 | `policy.json` → `edge` |
 | A remote-access tunnel (Tailscale was retired 2026-10-11; the Tailscale layer, legend row and button only appear while `policy.json` has a `tailscale` block) | its admin console | `policy.json` → `tailscale` |
 | NetBox name differs from real name | here | `policy.json` → `aliases` |

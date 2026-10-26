@@ -151,19 +151,15 @@
       "record": "omada.sqrd.link",
       "target": "host:nastradamus",
       "value": "10.10.10.20:30077",
-      "note": "Omada controller on nastradamus. Resolves through the wildcard to Pangolin, which proxies to the controller"
+      "note": "Omada controller on nastradamus. Resolves through the wildcard to Pangolin, which proxies to the controller",
+      "manual": true
     },
     {
       "record": "*.prtsr.nl",
       "target": "edge:cloudflare",
       "value": "static home IP",
-      "note": "Public, DNS only (raw TCP works)"
-    },
-    {
-      "record": "wiki.sqrd.link",
-      "target": "edge:internet",
-      "value": "sqrd-link.github.io",
-      "note": "AdGuard rewrite to GitHub Pages (the wiki)"
+      "note": "Public, DNS only (raw TCP works)",
+      "manual": true
     },
     {
       "record": "mail.sqrd.link",
