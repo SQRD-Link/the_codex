@@ -578,7 +578,7 @@ function legend(m) {
   s += row(5, sc(tower({ id: 'lg6' }), .38), 'torre di guardia', 'faces the world');
   s += row(6, `<path d="M-22 0 L22 0" class="ink sang" stroke-width="3"/>`, 'via aperta', 'permitted path (dashed: some ports only)');
   s += row(7, `<path d="M-8 -8 L8 8 M8 -8 L-8 8" class="ink" stroke-width="3"/>`, 'via chiusa', 'denied at the gate');
-  s += row(8, `<path d="M-22 0 L22 0" class="ink sang" stroke-width="2" stroke-dasharray="8 5 2 5"/>`, 'filo lungo', 'Tailscale, under the walls');
+  if (m.policy.tailscale) s += row(8, `<path d="M-22 0 L22 0" class="ink sang" stroke-width="2" stroke-dasharray="8 5 2 5"/>`, 'filo lungo', 'Tailscale, under the walls');
   return s + '</g>';
 }
 
@@ -720,6 +720,8 @@ function applyLayers() {
   for (const [k, on] of Object.entries(state.layers)) svg.querySelectorAll('.layer-' + k).forEach(el => el.classList.toggle('layer-off', !on));
   document.querySelectorAll('.seal').forEach(b => b.setAttribute('aria-pressed', String(!!state.layers[b.dataset.layer])));
   if (!state.layers.acl) document.getElementById('flows').innerHTML = '';
+  // the Tailscale layer only exists while the policy still has a tunnel
+  document.querySelectorAll('[data-layer="tailscale"]').forEach(b => { b.style.display = state.m?.policy.tailscale ? '' : 'none'; });
 }
 
 // ---- folio (detail panel)
@@ -793,7 +795,7 @@ function selectWard(id) {
   const deny = pairs.filter(p => p.res.verdict === 'deny').length, unk = pairs.filter(p => p.res.verdict === 'unknown').length;
   openFolio(`<h2>${esc(w.art)}</h2><p class="art">${roman(w.idx + 1)} · ${esc(w.name)} · vlan ${w.vid}</p><p class="lede">${esc(w.purpose || '')}</p>
     <dl><dt>Subnet</dt><dd><code>${esc(w.subnet)}</code></dd><dt>Gateway</dt><dd><code>${esc(w.subnet.replace(/\.0\/\d+$/, m.policy.gateway?.ip_suffix || '.254'))}</code></dd>
-    <dt>Tailscale</dt><dd>${w.tailscale ? 'routed' : 'not routed'}</dd><dt>Dwellers</dt><dd>${w.hosts.map(h => `<a href="#" data-goto="${esc(h.id)}">${esc(h.kind === 'clients' ? h.label : h.id)}</a>`).join(' · ') || '<em>none</em>'}</dd></dl>
+    ${m.policy.tailscale ? `<dt>Tailscale</dt><dd>${w.tailscale ? 'routed' : 'not routed'}</dd>` : ''}<dt>Dwellers</dt><dd>${w.hosts.map(h => `<a href="#" data-goto="${esc(h.id)}">${esc(h.kind === 'clients' ? h.label : h.id)}</a>`).join(' · ') || '<em>none</em>'}</dd></dl>
     <h3>From here the gate allows</h3><p>${ok.length ? ok.map(esc).join(' · ') : '<em>nothing on the LAN</em>'}</p>
     <p><span class="pill">${deny} denied</span><span class="pill">${unk} undocumented</span></p>
     ${rulesMentioning(m, ['vlan:' + id]).length ? `<h3>Rules that name it</h3><ul>${rulesMentioning(m, ['vlan:' + id]).map(ruleLi).join('')}</ul>` : ''}
