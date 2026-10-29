@@ -1,0 +1,36 @@
+services:
+  icloudpd-emma:
+    image: icloudpd/icloudpd:latest
+    container_name: icloudpd_emma
+    restart: unless-stopped
+    user: "3001:545"
+    volumes:
+      - /mnt/dataverse/automatons/data/icloudpd/emma-staging:/data
+      - /mnt/dataverse/automatons/data/icloudpd/emma-cookies:/cookies
+    command: >
+      icloudpd
+      --directory /data
+      --username ${ICLOUD_USERNAME}
+      --cookie-directory /cookies
+      --watch-with-interval 3600
+    stdin_open: true
+    tty: true
+
+  immich-upload-emma:
+    image: ghcr.io/immich-app/immich-cli:latest
+    container_name: immich_upload_emma
+    restart: unless-stopped
+    user: "3001:545"
+    environment:
+      IMMICH_INSTANCE_URL: ${IMMICH_INSTANCE_URL}
+      IMMICH_API_KEY: ${IMMICH_API_KEY}
+    volumes:
+      - /mnt/dataverse/automatons/data/icloudpd/emma-staging:/import
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          echo "$(date) - running upload pass"
+          immich upload --recursive --delete /import
+          sleep 3600
+        done

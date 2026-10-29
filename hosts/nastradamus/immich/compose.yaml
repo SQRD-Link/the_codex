@@ -1,0 +1,46 @@
+services:
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    container_name: immich_server
+    restart: unless-stopped
+    user: "3001:545"
+    env_file:
+      - .env
+    volumes:
+      - /mnt/dataverse/chronicles/immich:/data
+    ports:
+      - "2283:2283"
+    depends_on:
+      - immich-redis
+      - immich-postgres
+  immich-machine-learning:
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}-openvino
+    container_name: immich_machine_learning
+    restart: unless-stopped
+    user: "3001:545"
+    mem_limit: 3g
+    memswap_limit: 3g
+    group_add:
+      - "107"   # render group on nastradamus
+    env_file:
+      - .env
+    devices:
+      - /dev/dri:/dev/dri
+    volumes:
+      - /mnt/dataverse/automatons/data/immich/mlcache:/cache
+  immich-redis:
+    image: redis:6.2-alpine
+    container_name: immich_redis
+    restart: unless-stopped
+  immich-postgres:
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
+    container_name: immich_postgres
+    restart: unless-stopped
+    shm_size: 128mb
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE_NAME}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - /mnt/dataverse/automatons/data/immich/postgress:/var/lib/postgresql/data
