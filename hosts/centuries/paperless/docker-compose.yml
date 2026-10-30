@@ -1,0 +1,108 @@
+services:
+  broker:
+    image: docker.io/library/redis:7
+    container_name: paperless-redis
+    restart: unless-stopped
+    volumes:
+      - /srv/docker/volumes/paperless/redis:/data
+
+  db:
+    image: docker.io/library/postgres:17
+    container_name: paperless-db
+    restart: unless-stopped
+    volumes:
+      - /srv/docker/volumes/paperless/db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: ${PAPERLESS_DBPASS}
+
+  gotenberg:
+    image: docker.io/gotenberg/gotenberg:8
+    container_name: paperless-gotenberg
+    restart: unless-stopped
+    command:
+      - "gotenberg"
+      - "--chromium-disable-javascript=true"
+      - "--chromium-allow-list=file:///tmp/.*"
+
+  tika:
+    image: docker.io/apache/tika:latest
+    container_name: paperless-tika
+    restart: unless-stopped
+
+  paperless:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    container_name: paperless
+    restart: unless-stopped
+    depends_on:
+      - db
+      - broker
+      - gotenberg
+      - tika
+    environment:
+      TZ: Europe/Amsterdam
+      PAPERLESS_TIME_ZONE: Europe/Amsterdam
+      PAPERLESS_REDIS: redis://broker:6379
+      PAPERLESS_DBHOST: db
+      PAPERLESS_DBNAME: paperless
+      PAPERLESS_DBUSER: paperless
+      PAPERLESS_DBPASS: ${PAPERLESS_DBPASS}
+      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY}
+      PAPERLESS_URL: https://paperless.sqrd.link
+      PAPERLESS_CSRF_TRUSTED_ORIGINS: https://paperless.sqrd.link
+      PAPERLESS_ADMIN_USER: ${PAPERLESS_ADMIN_USER}
+      PAPERLESS_ADMIN_PASSWORD: ${PAPERLESS_ADMIN_PASSWORD}
+      PAPERLESS_OCR_LANGUAGE: nld+eng
+      PAPERLESS_OCR_LANGUAGES: nld
+      PAPERLESS_TIKA_ENABLED: 1
+      PAPERLESS_TIKA_GOTENBERG_ENDPOINT: http://gotenberg:3000
+      PAPERLESS_TIKA_ENDPOINT: http://tika:9998
+      # centuries has 6 vCPU / 7.8 GiB shared with ~30 other containers
+      PAPERLESS_TASK_WORKERS: 2
+      PAPERLESS_THREADS_PER_WORKER: 2
+      PAPERLESS_WEBSERVER_WORKERS: 2
+      USERMAP_UID: 1000
+      USERMAP_GID: 1000
+    volumes:
+      - /srv/docker/volumes/paperless/data:/usr/src/paperless/data
+      - media:/usr/src/paperless/media
+      - export:/usr/src/paperless/export
+      - consume:/usr/src/paperless/consume
+    networks:
+      - default
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.paperless.rule=Host(`paperless.sqrd.link`)"
+      - "traefik.http.routers.paperless.entrypoints=websecure"
+      - "traefik.http.routers.paperless.tls=true"
+      - "traefik.http.services.paperless.loadbalancer.server.port=8000"
+
+# Documents live on nastradamus (dataset dataverse/scriptorium), NFSv4.
+# Switch hosts by changing PAPERLESS_NFS_HOST in .env, then recreate the stack.
+# Database, Redis and the search index stay local (Postgres does not belong on NFS).
+volumes:
+  media:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=${PAPERLESS_NFS_HOST},nfsvers=4.2,rw,noatime,hard
+      device: ":/mnt/dataverse/scriptorium/media"
+  export:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=${PAPERLESS_NFS_HOST},nfsvers=4.2,rw,noatime,hard
+      device: ":/mnt/dataverse/scriptorium/export"
+  consume:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=${PAPERLESS_NFS_HOST},nfsvers=4.2,rw,noatime,hard
+      device: ":/mnt/dataverse/scriptorium/consume"
+
+networks:
+  proxy:
+    external: true
