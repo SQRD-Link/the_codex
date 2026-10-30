@@ -63,12 +63,12 @@ services:
       PAPERLESS_THREADS_PER_WORKER: 2
       PAPERLESS_WEBSERVER_WORKERS: 2
       USERMAP_UID: 1000
-      USERMAP_GID: 1000
+      USERMAP_GID: 3001
     volumes:
       - /srv/docker/volumes/paperless/data:/usr/src/paperless/data
-      - media:/usr/src/paperless/media
-      - export:/usr/src/paperless/export
-      - consume:/usr/src/paperless/consume
+      - media:/usr/src/paperless/media:nocopy
+      - export:/usr/src/paperless/export:nocopy
+      - consume:/usr/src/paperless/consume:nocopy
     networks:
       - default
       - proxy
