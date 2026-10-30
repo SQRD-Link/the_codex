@@ -1,0 +1,4 @@
+name: paperless
+domain: paperless.sqrd.link
+target: {ip: 10.10.100.75, port: 443, method: https}
+sso: true
