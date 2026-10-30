@@ -27,7 +27,8 @@ services:
       - "--chromium-allow-list=file:///tmp/.*"
 
   tika:
-    image: docker.io/apache/tika:latest
+    # Pinned to 3.x: Tika 4 (latest since Aug 2026) answers 406 on /tika/text, which Paperless does not support yet.
+    image: docker.io/apache/tika:3.3.1.0
     container_name: paperless-tika
     restart: unless-stopped
 
